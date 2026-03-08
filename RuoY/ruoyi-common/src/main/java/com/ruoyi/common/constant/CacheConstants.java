@@ -41,4 +41,9 @@ public class CacheConstants
      * 登录账户密码错误次数 redis key
      */
     public static final String PWD_ERR_CNT_KEY = "pwd_err_cnt:";
+
+    /**
+     * 行政区域查询缓存 redis key（高德API结果缓存，减少外部调用）
+     */
+    public static final String SYS_REGION_KEY = "sys_region:";
 }

@@ -67,6 +67,15 @@
                             type="primary"
                             plain
                             icon="Upload"
+                            @click="addSimulationData"
+                            :disabled="single"
+                            >添加仿真数据</el-button>
+                        </el-col>
+                        <el-col :span="1.5">
+                            <el-button
+                            type="primary"
+                            plain
+                            icon="Upload"
                             @click="openFileManager"
                             >导入</el-button>
                         </el-col>
@@ -525,6 +534,7 @@ import BinaryViewer from '@/views/viewer/BinaryViewer.vue'
 import PDFViewer from '@/views/viewer/PDFViewer.vue'
 import ExcelViewer from '@/views/viewer/ExcelViewer.vue'
 import { submitDownloadTask, getDownloadTaskStatus, downloadFile } from '@/api/file'
+
 const dateRange = ref([])
 const { proxy } = getCurrentInstance()
 const treeTableOptions = ref(undefined)
@@ -606,6 +616,9 @@ function handleExportData() {
 
 function handleRename() {
   console.log("重命名数据")
+}
+function addSimulationData() {
+  console.log("添加仿真数据")
 }
 
 const uploadDataForm = reactive({
@@ -707,8 +720,9 @@ async function handleGeneratePath() {
     experimentform.path = await generatePath(experimentform.name)
   }
 }
-function getProjects() {
-  getInfo(null, 'experiment').then(res => {
+
+function getProjects(){
+    getInfo(null, 'experiment').then(res => {
     projectOptions.value = res.projects || []
   }).catch(err => {
     ElMessage.error('获取项目信息失败: ' + (err.message || '未知错误'))

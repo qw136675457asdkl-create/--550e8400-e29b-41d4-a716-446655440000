@@ -134,3 +134,9 @@ xss:
   excludes: /system/notice
   # 匹配链接
   urlPatterns: /system/*,/monitor/*,/tool/*
+# 第三方API配置
+third-api:
+  amap:
+    key: "de74010723ccf9221ed20a8b75092a8b"
+    # 高德行政区域查询接口
+    district-url: "https://restapi.amap.com/v3/config/district"

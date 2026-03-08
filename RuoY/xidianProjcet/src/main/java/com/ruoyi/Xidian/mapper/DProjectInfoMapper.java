@@ -1,5 +1,6 @@
 package com.ruoyi.Xidian.mapper;
 
+import java.util.ArrayList;
 import java.util.List;
 import com.ruoyi.Xidian.domain.DProjectInfo;
 import org.apache.ibatis.annotations.Mapper;
@@ -62,4 +63,6 @@ public interface DProjectInfoMapper
     public int deleteDProjectInfoByProjectIds(Long[] projectIds);
 
     public List<DProjectInfo> selectAllDProjectInfo();
+
+    List<DProjectInfo> selectDProjectInfoByProjectIds(List<Long> projectIds);
 }

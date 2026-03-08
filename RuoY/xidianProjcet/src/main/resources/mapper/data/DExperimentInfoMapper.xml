@@ -48,6 +48,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <include refid="selectDExperimentInfoVo"/>
         where e.experiment_id = #{experimentId}
     </select>
+    <select id="selectDExperimentInfoByExperimentIds" parameterType="java.util.List" resultMap="DExperimentInfoResult">
+        select e.experiment_id, e.target_id, e.experiment_name, e.project_id, e.start_time, e.location, e.platform_config, e.create_by, e.create_time, e.update_time, e.content_desc,e.path, d.project_name from SYSTEM_COLLABORATION_TEST.d_experiment_info e
+        left join SYSTEM_COLLABORATION_TEST.D_PROJECT_INFO d on e.project_id = d.project_id
+        where e.experiment_id in
+        <foreach collection="list" item="experimentId" open="(" close=")" separator=",">
+            #{experimentId}
+        </foreach>
+    </select>
 
     <insert id="insertDExperimentInfo" parameterType="DExperimentInfo">
         insert into SYSTEM_COLLABORATION_TEST.d_experiment_info

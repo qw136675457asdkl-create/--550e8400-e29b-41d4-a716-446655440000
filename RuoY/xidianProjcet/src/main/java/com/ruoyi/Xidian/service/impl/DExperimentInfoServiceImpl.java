@@ -1,9 +1,10 @@
 package com.ruoyi.Xidian.service.impl;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import com.ruoyi.Xidian.domain.DProjectInfo;
@@ -12,6 +13,7 @@ import com.ruoyi.Xidian.mapper.DProjectInfoMapper;
 import com.ruoyi.Xidian.mapper.DTargetInfoMapper;
 import com.ruoyi.common.annotation.DataSource;
 import com.ruoyi.common.enums.DataSourceType;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -161,7 +163,16 @@ public class DExperimentInfoServiceImpl implements IDExperimentInfoService {
      */
     @Override
     public int insertDExperimentInfo(DExperimentInfo dExperimentInfo) {
-        dExperimentInfo.setCreateTime(DateUtils.getNowDate());
+        String ProjectName=dProjectInfoMapper.selectDProjectInfoByProjectId(dExperimentInfo.getProjectId()).getProjectName();
+        String ExperimentPath= "/home/hyy1208/data/" + ProjectName + "/" + dExperimentInfo.getExperimentName();
+        Path path= Paths.get(ExperimentPath);
+        try{
+            Files.createDirectories(path);
+        } catch (IOException e) {
+            throw new ServiceException("创建试验目录失败：" + e.getMessage());
+        }
+        //存储相对路径
+        dExperimentInfo.setPath("/"+dExperimentInfo.getExperimentName());
         return dExperimentInfoMapper.insertDExperimentInfo(dExperimentInfo);
     }
 
@@ -174,6 +185,25 @@ public class DExperimentInfoServiceImpl implements IDExperimentInfoService {
     @Override
     public int updateDExperimentInfo(DExperimentInfo dExperimentInfo) {
         dExperimentInfo.setUpdateTime(DateUtils.getNowDate());
+        //检查路径是否合法
+        if(!dExperimentInfo.getPath().startsWith("/")) {
+            throw new ServiceException("路径格式错误，必须以'/'开头");
+        }
+        String ExperimentId=dExperimentInfo.getExperimentId();
+        String oldPath=dExperimentInfoMapper.selectDExperimentInfoByExperimentId(ExperimentId).getPath();
+        //修改文件路径
+        String ParentPath=dProjectInfoMapper.selectDProjectInfoByProjectId(dExperimentInfo.getProjectId()).getPath();
+        String ExperimentPath= "/home/hyy1208/data" + ParentPath + dExperimentInfo.getPath();
+        Path newPath= Paths.get(ExperimentPath);
+        try{
+            //检查新路径是否已存在
+            if(Files.exists(newPath)&&!newPath.equals(Paths.get("/home/hyy1208/data" + ParentPath + oldPath))){
+                throw new ServiceException("新路径已存在，请重新输入");
+            }
+            Files.move(Paths.get("/home/hyy1208/data" + ParentPath + oldPath),newPath);
+        } catch (IOException e) {
+            throw new ServiceException("修改试验目录失败：" + e.getMessage());
+        }
         return dExperimentInfoMapper.updateDExperimentInfo(dExperimentInfo);
     }
 
@@ -185,6 +215,45 @@ public class DExperimentInfoServiceImpl implements IDExperimentInfoService {
      */
     @Override
     public int deleteDExperimentInfoByExperimentIds(String[] experimentIds) {
+        if (experimentIds == null || experimentIds.length == 0) {
+            return 0;
+        }
+        if(experimentIds[0].equals("0")){
+            return 1;
+        }
+        List<DExperimentInfo> experimentInfos = dExperimentInfoMapper.selectDExperimentInfoByExperimentIds(Arrays.asList(experimentIds));
+        if (experimentInfos.size() != experimentIds.length) {
+            throw new ServiceException("部分试验信息不存在，请刷新后重试");
+        }
+
+        List<Path> dirPaths = new ArrayList<>();
+        for (DExperimentInfo expInfo : experimentInfos) {
+            Long projectId = expInfo.getProjectId();
+            if (projectId == null) {
+                throw new ServiceException("试验所属项目不存在，试验ID：" + expInfo.getExperimentId());
+            }
+            String parentPath = dProjectInfoMapper.selectDProjectInfoByProjectId(projectId).getPath();
+            String dirPathStr = "/home/hyy1208/data" + parentPath + "/" + expInfo.getPath();
+            Path dirPath = Paths.get(dirPathStr);
+            dirPaths.add(dirPath);
+
+            try {
+                if (Files.exists(dirPath) && Files.list(dirPath).findAny().isPresent()) {
+                    throw new ServiceException("试验目录下有文件，不能删除，试验路径：" + expInfo.getPath());
+                }
+            } catch (IOException e) {
+                throw new ServiceException("检查试验目录失败：" + e.getMessage());
+            }
+        }
+
+        for (Path dirPath : dirPaths) {
+            try {
+                Files.deleteIfExists(dirPath);
+            } catch (IOException e) {
+                throw new ServiceException("删除试验目录失败：" + e.getMessage());
+            }
+        }
+
         return dExperimentInfoMapper.deleteDExperimentInfoByExperimentIds(experimentIds);
     }
 

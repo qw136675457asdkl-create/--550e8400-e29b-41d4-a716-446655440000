@@ -40,6 +40,13 @@
     <select id="selectAllDProjectInfo" resultMap="DProjectInfoResult">
         <include refid="selectDProjectInfoVo"/>
     </select>
+    <select id="selectDProjectInfoByProjectIds" resultMap="DProjectInfoResult">
+        <include refid="selectDProjectInfoVo"/>
+        where project_id in
+        <foreach collection="projectIds" item="projectId" open="(" close=")" separator=",">
+            #{projectId}
+        </foreach>
+    </select>
 
     <insert id="insertDProjectInfo" parameterType="DProjectInfo">
         insert into SYSTEM_COLLABORATION_TEST.d_project_info

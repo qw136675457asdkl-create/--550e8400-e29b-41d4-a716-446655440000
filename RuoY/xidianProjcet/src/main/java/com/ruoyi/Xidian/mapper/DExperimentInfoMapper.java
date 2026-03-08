@@ -60,4 +60,6 @@ public interface DExperimentInfoMapper
      * @return 结果
      */
     public int deleteDExperimentInfoByExperimentIds(String[] experimentIds);
+
+    List<DExperimentInfo> selectDExperimentInfoByExperimentIds(List<String> experimentIds);
 }

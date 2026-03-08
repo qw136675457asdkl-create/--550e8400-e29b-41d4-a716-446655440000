@@ -136,7 +136,7 @@
     <el-dialog :title="title" v-model="open" width="500px" append-to-body>
       <el-form ref="infoRef" :model="form" :rules="rules" label-width="80px">
         <el-form-item label="名称" prop="name">
-          <el-input v-model="form.name" placeholder="请输入名称" @blur="handleGeneratePath" />
+          <el-input v-model="form.name" placeholder="请输入名称"/>
         </el-form-item>
         <el-form-item label="所属项目" prop="parentId" v-if="form.type === 'experiment'">
           <el-select v-model="form.parentId" placeholder="请选择所属项目" filterable clearable>
@@ -186,7 +186,11 @@
           </el-date-picker>
         </el-form-item>
         <el-form-item label="路径" prop="path">
-          <el-input v-model="form.path" placeholder="自动生成路径" disabled />
+          <el-input
+            v-model="form.path"
+            :placeholder="isAdd ? '自动生成路径' : '请输入路径'"
+            :disabled="isAdd"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -222,7 +226,6 @@
 
 <script setup name="Info">
 import { listInfo, getInfo, delInfo, addInfo, updateInfo} from "@/api/data/info"
-import { generatePath } from "@/utils/generatePath"
 import { addDateRange } from "@/utils/ruoyi"
 
 const { proxy } = getCurrentInstance()
@@ -241,7 +244,9 @@ const dateRange = ref([])
 const infoTableRef = ref(null)
 const multiple = ref(true)
 const selectedRows = ref([])
-
+const isAdd = computed(() => {
+  return title.value === '添加项目' || title.value === '添加试验';
+});
 const data = reactive({
   form: {},
   queryParams: {
@@ -320,13 +325,6 @@ function cellStyle({ row, column, rowIndex, columnIndex }) {
 /** 搜索按钮操作 */
 function handleQuery() {
   getList()
-}
-
-/** 自动生成路径 */
-async function handleGeneratePath() {
-  if (form.value.name) {
-    form.value.path = await generatePath(form.value.name)
-  }
 }
 
 /** 重置按钮操作 */

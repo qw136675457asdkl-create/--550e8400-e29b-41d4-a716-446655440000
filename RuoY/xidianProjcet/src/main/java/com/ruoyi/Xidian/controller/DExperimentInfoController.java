@@ -52,7 +52,7 @@ public class DExperimentInfoController extends BaseController
      * 导出试验信息主列表
      */
     @PreAuthorize("@ss.hasPermi('data:info:export')")
-    @Log(title = "试验信息主", businessType = BusinessType.EXPORT)
+    @Log(title = "导出试验信息", businessType = BusinessType.EXPORT)
     @PostMapping("/export")
     public void export(HttpServletResponse response, DExperimentInfo dExperimentInfo)
     {
@@ -97,7 +97,6 @@ public class DExperimentInfoController extends BaseController
             DProjectInfo dProjectInfo=new DProjectInfo();
             dProjectInfo.setProjectName(treeTableVo.getName());
             dProjectInfo.setCreateBy(SecurityUtils.getUsername());
-            dProjectInfo.setCreateTime(DateUtils.parseDate(treeTableVo.getCreateTime()));
             dProjectInfo.setProjectContentDesc(treeTableVo.getContentDesc());
             return toAjax(dProjectInfoService.insertDProjectInfo(dProjectInfo));
         }
