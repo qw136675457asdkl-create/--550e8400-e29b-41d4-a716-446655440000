@@ -35,7 +35,7 @@ import com.ruoyi.common.enums.BusinessType;
 public class FileManageController extends BaseController
 {
     // 【配置点】生产环境修改此路径
-    private static final String BASE_DIR = "C:\\data";
+    private static final String BASE_DIR = "/home/hyy1208/data";
 
     private static final boolean ENABLE_PATH_RESTRICTION = true;
 

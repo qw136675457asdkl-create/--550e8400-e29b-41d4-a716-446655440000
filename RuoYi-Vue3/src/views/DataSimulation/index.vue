@@ -61,51 +61,55 @@
                             </div>
                         </el-col>
                     </el-row>
-                    <el-row :gutter="10" class="mb8">
-                        <el-col :span="1.5">
-                            <el-button
-                            type="primary"
-                            plain
-                            icon="Upload"
-                            @click="addSimulationData"
-                            :disabled="single"
-                            >添加仿真数据</el-button>
-                        </el-col>
-                        <el-col :span="1.5">
-                            <el-button
-                            type="primary"
-                            plain
-                            icon="Upload"
-                            @click="openFileManager"
-                            >导入</el-button>
-                        </el-col>
-                        <el-col :span="1.5">
-                            <el-button
-                            type="primary"
-                            plain
-                            icon="Download"
-                            @click="handleExportData"
-                            >导出</el-button>
-                        </el-col>
-                        <el-col :span="1.5">
-                            <el-button
-                            type="info"
-                            plain
-                            icon="Edit"
-                            @click="handleRename"
-                            >重命名</el-button>
-                        </el-col>
-                        <el-col :span="1.5">
-                            <el-button
-                            type="danger"
-                            plain
-                            icon="Delete"
-                            :disabled="multiple"
-                            @click="handleDelete()"
-                            >删除</el-button>
-                        </el-col>
-                        <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
-                    </el-row>
+                  <el-row :gutter="10" class="mb8">
+                    <el-col :span="1.5">
+                      <el-button
+                          type="primary"
+                          plain
+                          icon="Plus"
+                          @click="handleAddSimulationData"
+                      >添加仿真数据</el-button>
+                    </el-col>
+
+                    <el-col :span="1.5">
+                      <el-button
+                          type="success"
+                          plain
+                          icon="DocumentAdd"
+                          @click="handleAddProjectInfo"
+                      >添加项目信息</el-button>
+                    </el-col>
+
+                    <el-col :span="1.5">
+                      <el-button
+                          type="info"
+                          plain
+                          icon="FolderAdd"
+                          @click="handleAddExperimentInfo"
+                      >添加试验信息</el-button>
+                    </el-col>
+
+                    <el-col :span="1.5">
+                      <el-button
+                          type="danger"
+                          plain
+                          icon="Delete"
+                          :disabled="multiple"
+                          @click="handleDelete"
+                      >删除</el-button>
+                    </el-col>
+
+                    <el-col :span="1.5">
+                      <el-button
+                          type="warning"
+                          plain
+                          icon="Refresh"
+                          @click="getList"
+                      >刷新</el-button>
+                    </el-col>
+
+                    <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
+                  </el-row>
 
                     <el-table v-loading="loading" :data="businessList" @selection-change="handleSelectionChange">
                         <el-table-column type="selection" width="55" align="center" />
@@ -422,6 +426,44 @@
                     </el-row>
                 </el-form>
 
+                <!-- 路径导航和操作栏 - 统一高度对齐 -->
+                <div class="import-path-bar">
+                    <el-input v-model="currentPath" placeholder="输入文件夹路径" clearable @keyup.enter="loadFileList" class="import-path-input">
+                        <template #append>
+                            <el-button type="primary" @click="loadFileList">打开</el-button>
+                        </template>
+                    </el-input>
+                    <div class="import-path-actions">
+                        <el-button icon="ArrowUp" @click="handleGoUp" :disabled="currentPath === INITIAL_PATH">返回上级</el-button>
+                        <el-button @click="handleNewFolder">新建文件夹</el-button>
+                        <el-button @click="handleRefresh">刷新</el-button>
+                    </div>
+                </div>
+
+                <!-- 文件列表 -->
+                <el-table :data="fileList" v-loading="fileLoading" stripe class="import-file-table" height="220">
+                    <el-table-column label="文件名" width="300" prop="name">
+                        <template #default="{ row }">
+                            <el-icon v-if="row.isDir" style="margin-right: 8px;"><el-icon-folder /></el-icon>
+                            <el-icon v-else style="margin-right: 8px;"><el-icon-document /></el-icon>
+                            <el-link type="primary" :underline="false" @click="handleFileOpen(row)">{{ row.name }}</el-link>
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="大小" width="100" prop="size">
+                        <template #default="{ row }">{{ formatSize(row.size) }}</template>
+                    </el-table-column>
+                    <el-table-column label="修改时间" width="180" prop="modified">
+                        <template #default="{ row }">{{ formatDate(row.modified) }}</template>
+                    </el-table-column>
+                    <el-table-column label="操作" width="200">
+                        <template #default="{ row }">
+                            <el-button link type="primary" size="small" @click="handleFilePreview(row)">预览</el-button>
+                            <el-button link type="primary" size="small" @click="handleFileRename(row)">重命名</el-button>
+                            <el-button link type="danger" size="small" @click="handleFileDelete(row)">删除</el-button>
+                        </template>
+                    </el-table-column>
+                </el-table>
+
                 <!-- 文件上传 -->
                 <el-divider>选择文件上传至当前文件夹</el-divider>
                 <el-upload drag action="" :auto-upload="false" :on-change="handleFileSelect" v-model:file-list="uploadFiles" class="import-upload">
@@ -432,6 +474,15 @@
             <template #footer>
                 <el-button @click="cancelUpload">取消</el-button>
                 <el-button type="primary" @click="submitUpload" :loading="fileLoading">导入数据</el-button>
+            </template>
+        </el-dialog>
+
+        <!-- 文件管理器预览对话框 -->
+        <el-dialog v-model="fileManagerPreviewVisible" :title="`预览: ${fileManagerPreviewFile?.name || ''}`" width="70%" append-to-body>
+            <component :is="fileManagerPreviewComponent" :file="fileManagerPreviewFileInfo" v-if="fileManagerPreviewFile" />
+            <el-empty v-else description="暂无预览内容" />
+            <template #footer>
+                <el-button type="primary" @click="fileManagerPreviewVisible = false">关闭</el-button>
             </template>
         </el-dialog>
 
@@ -448,14 +499,33 @@
                 </div>
             </template>
         </el-dialog>
+
+        <!-- 重命名对话框 -->
+        <el-dialog v-model="renameVisible" title="重命名" width="40%" append-to-body>
+            <el-input v-model="newFileName" placeholder="输入新文件名" />
+            <template #footer>
+                <el-button @click="renameVisible = false">取消</el-button>
+                <el-button type="primary" @click="submitRename">确定</el-button>
+            </template>
+        </el-dialog>
+
+        <!-- 新建文件夹对话框 -->
+        <el-dialog v-model="newFolderVisible" title="新建文件夹" width="40%" append-to-body>
+            <el-input v-model="newFolderName" placeholder="输入文件夹名称" />
+            <template #footer>
+                <el-button @click="newFolderVisible = false">取消</el-button>
+                <el-button type="primary" @click="submitNewFolder">创建</el-button>
+            </template>
+        </el-dialog>
     </div>
 </template>
 <script setup name="Business">
 import useAppStore from '@/store/modules/app'
 import {Splitpanes, Pane} from 'splitpanes'
 import 'splitpanes/dist/splitpanes.css'
-import {getExperimentList,getdataList,getdataDetail,updatedata,deldata,adddata} from '@/api/data/bussiness'
+import {getExperimentList,getdataList,getdataDetail,updatedata,deldata,adddata} from '@/api/DataSimulation/DataSimulation'
 import {getInfo} from "@/api/data/info"
+import {generatePath} from '@/utils/generatePath'
 import { addDateRange } from "@/utils/ruoyi"
 import request from '@/utils/request'
 import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
@@ -468,6 +538,7 @@ import BinaryViewer from '@/views/viewer/BinaryViewer.vue'
 import PDFViewer from '@/views/viewer/PDFViewer.vue'
 import ExcelViewer from '@/views/viewer/ExcelViewer.vue'
 import { submitDownloadTask, getDownloadTaskStatus, downloadFile } from '@/api/file'
+import { get } from '@vueuse/core'
 
 const dateRange = ref([])
 const { proxy } = getCurrentInstance()
@@ -491,12 +562,19 @@ const single = ref(true)
 const multiple = ref(true)
 
 // 文件管理器相关状态
-const INITIAL_PATH = 'E:\\data'
+const INITIAL_PATH = '/home/hyy1208/data'
 const currentPath = ref(INITIAL_PATH)
+const fileList = ref([])
 const fileLoading = ref(false)
 const importVisible = ref(false)
+const renameVisible = ref(false)
+const newFolderVisible = ref(false)
 const uploadFiles = ref([])
+const newFileName = ref('')
+const newFolderName = ref('')
 const fileManagerPreviewFile = ref(null)
+const fileManagerPreviewVisible = ref(false)
+const renameFile = ref(null)
 const uploadDataFormRef = ref(null)
 
 // 详情预览相关状态
@@ -504,49 +582,46 @@ const detailVisible = ref(false)
 const detailFile = ref(null)
 const detailTitle = ref("文件预览")
 
-/** 打开文件管理器 (导入) */
-function openFileManager() {
-  // 加载必要数据
-  if (!treeTableOptions.value || treeTableOptions.value.length === 0) {
-      getTreeData()
-  }
-  importVisible.value = true
-  getInfo(null, 'experiment').then(res => {
-    targetTypeOptions.value = res.targetTypes || []
-  }).catch(err => {
-    ElMessage.error('获取试验目标失败: ' + (err.message || '未知错误'))
-  })
-  loadFileList()
-}
+// /** 打开文件管理器 (导入) */
+// function openFileManager() {
+//   // 加载必要数据
+//   if (!treeTableOptions.value || treeTableOptions.value.length === 0) {
+//       getTreeData()
+//   }
+//   importVisible.value = true
+//   getInfo(null, 'experiment').then(res => {
+//     targetTypeOptions.value = res.targetTypes || []
+//   }).catch(err => {
+//     ElMessage.error('获取试验目标失败: ' + (err.message || '未知错误'))
+//   })
+//   loadFileList()
+// }
+//
+// /** 导出数据 (下载) */
+// function handleExportData() {
+//   if (ids.value.length === 0) {
+//     ElMessage.warning("请选择要导出的数据")
+//     return
+//   }
 
-/** 导出数据 (下载) */
-function handleExportData() {
-  if (ids.value.length === 0) {
-    ElMessage.warning("请选择要导出的数据")
-    return
-  }
-  
-  const selectedRows = businessList.value.filter(item => ids.value.includes(item.id))
-  // 获取所有非空的文件路径
-  const paths = selectedRows.map(item => item.dataFilePath).filter(p => p)
-  
-  if (paths.length === 0) {
-    ElMessage.warning("选中的数据中没有关联的文件路径")
-    return
-  }
-  
-  submitDownloadTask(paths).then(res => {
-    if (res.code === 200) pollProgress(res.data)
-    else ElMessage.error(res.msg)
-  }).catch(e => ElMessage.error('导出请求失败: ' + (e.message || '未知错误')))
-}
+  // const selectedRows = businessList.value.filter(item => ids.value.includes(item.id))
+  // // 获取所有非空的文件路径
+  // const paths = selectedRows.map(item => item.dataFilePath).filter(p => p)
 
-function handleRename() {
-  console.log("重命名数据")
-}
-function addSimulationData() {
-  console.log("添加仿真数据")
-}
+  // if (paths.length === 0) {
+  //   ElMessage.warning("选中的数据中没有关联的文件路径")
+  //   return
+  // }
+
+//   submitDownloadTask(paths).then(res => {
+//     if (res.code === 200) pollProgress(res.data)
+//     else ElMessage.error(res.msg)
+//   }).catch(e => ElMessage.error('导出请求失败: ' + (e.message || '未知错误')))
+// }
+
+// function handleRename() {
+//   console.log("重命名数据")
+// }
 
 const uploadDataForm = reactive({
   dataName: '',
@@ -641,16 +716,47 @@ function getTreeData() {
         console.error('Failed to load tree data:', error)
     })
 }
+/** 自动生成路径 */
+async function handleGeneratePath() {
+  if (experimentform.name) {
+    experimentform.path = await generatePath(experimentform.name)
+  }
+}
 
-function getProjects(){
-    getInfo(null, 'experiment').then(res => {
-    projectOptions.value = res.projects || []
-  }).catch(err => {
-    ElMessage.error('获取项目信息失败: ' + (err.message || '未知错误'))
+function handleAddExperiment() {
+  // 重置试验表单数据
+  Object.assign(experimentform, {
+    id: null,
+    name: null,
+    parentId: null,
+    targetId: null,
+    startTime: null,
+    location: null,
+    contentDesc: null,
+    path: null
   })
+  getInfo(null, 'experiment').then(res => {
+    projectOptions.value = res.projects || []
+    targetTypeOptions.value = res.targetTypes || []
+  }).catch(err => {
+    ElMessage.error('获取试验信息失败: ' + (err.message || '未知错误'))
+  } )
+  openExperiment.value = true
+  addExperimentitle.value = "添加试验"
 }
 
 // --- 文件管理器逻辑开始 ---
+
+const fileManagerPreviewFileInfo = computed(() => {
+  if (!fileManagerPreviewFile.value) return null
+  return {
+    name: fileManagerPreviewFile.value.name,
+    path: fileManagerPreviewFile.value.path,
+    contentUrl: `/api/file/content?path=${encodeURIComponent(fileManagerPreviewFile.value.path)}`
+  }
+})
+
+const fileManagerPreviewComponent = computed(() => getPreviewComponent(fileManagerPreviewFile.value))
 
 const detailFileInfo = computed(() => {
   if (!detailFile.value) return null
@@ -667,8 +773,8 @@ function getPreviewComponent(file) {
   if (!file) return null
   const fileName = file.name.toLowerCase()
   let type = 'binary'
-  
-  if (fileName.endsWith('.png') || fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || 
+
+  if (fileName.endsWith('.png') || fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') ||
       fileName.endsWith('.gif') || fileName.endsWith('.bmp')) {
     type = 'image'
   } else if (fileName.endsWith('.mp4') || fileName.endsWith('.webm') || fileName.endsWith('.avi')) {
@@ -695,6 +801,86 @@ function getPreviewComponent(file) {
   return componentMap[type]
 }
 
+const loadFileList = async () => {
+  fileLoading.value = true
+  try {
+    const res = await request({
+      url: '/api/file/list',
+      method: 'get',
+      params: { path: currentPath.value }
+    })
+    fileList.value = (res.data || []).sort((a, b) => {
+      if (a.isDir !== b.isDir) return b.isDir - a.isDir
+      return a.name.localeCompare(b.name)
+    })
+  } catch (err) {
+    ElMessage.error('加载文件列表失败: ' + err.message)
+  } finally {
+    fileLoading.value = false
+  }
+}
+
+const handleFileOpen = (row) => {
+  if (row.isDir) {
+    currentPath.value = row.path
+    loadFileList()
+  }
+}
+
+const handleFilePreview = (row) => {
+  if (!row.isDir) {
+    fileManagerPreviewFile.value = row
+    fileManagerPreviewVisible.value = true
+  }
+}
+
+const handleFileRename = (row) => {
+  renameFile.value = row
+  newFileName.value = row.name
+  renameVisible.value = true
+}
+
+const submitRename = async () => {
+  try {
+    await request({
+      url: '/api/file/rename',
+      method: 'post',
+      data: {
+        oldPath: renameFile.value.path,
+        newName: newFileName.value
+      }
+    })
+    ElMessage.success('重命名成功')
+    renameVisible.value = false
+    loadFileList()
+  } catch (err) {
+    ElMessage.error('重命名失败')
+  }
+}
+
+const handleFileDelete = (row) => {
+  ElMessageBox.confirm(
+    `确定删除 "${row.name}" 吗?`,
+    '警告',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      await request({
+        url: '/api/file/delete',
+        method: 'post',
+        data: { path: row.path }
+      })
+      ElMessage.success('删除成功')
+      loadFileList()
+    } catch (err) {
+      ElMessage.error('删除失败')
+    }
+  })
+}
 
 const selectableTreeOptions = computed(() => {
     const disableProjects = (nodes) => {
@@ -739,7 +925,7 @@ const submitUpload = async () => {
   if (!uploadDataFormRef.value) return
   await uploadDataFormRef.value.validate(async (valid) => {
     if (!valid) return
-    
+
     if (uploadFiles.value.length === 0) {
         ElMessage.warning('请选择要上传的文件')
         return
@@ -750,7 +936,7 @@ const submitUpload = async () => {
             const formData = new FormData()
             formData.append('file', file.raw)
             formData.append('path', currentPath.value)
-            
+
             await request({
                 url: '/api/file/upload',
                 method: 'post',
@@ -760,7 +946,7 @@ const submitUpload = async () => {
 
             // 上传成功后，保存业务数据
             const fullPath = currentPath.value + (currentPath.value.endsWith('\\') || currentPath.value.endsWith('/') ? '' : '/') + (file.raw.webkitRelativePath || file.name)
-            
+
             const businessData = {
                 dataName: uploadDataForm.dataName || file.name,
                 experimentId: uploadDataForm.experimentId,
@@ -773,7 +959,7 @@ const submitUpload = async () => {
                 sampleFrequency: Math.floor(Math.random() * 1000) + 1,
                 workStatus: ['正常', '异常', '待机'][Math.floor(Math.random() * 3)]
             }
-            
+
             await adddata(businessData)
         }
         ElMessage.success('数据导入成功')
@@ -784,13 +970,70 @@ const submitUpload = async () => {
     }
   })
 }
+
+const handleNewFolder = () => {
+  newFolderName.value = ''
+  newFolderVisible.value = true
+}
+
+const submitNewFolder = async () => {
+  if (!newFolderName.value.trim()) {
+    ElMessage.warning('文件夹名称不能为空')
+    return
+  }
+
+  try {
+    await request({
+      url: '/api/file/mkdir',
+      method: 'post',
+      data: {
+        path: currentPath.value,
+        dirName: newFolderName.value
+      }
+    })
+    ElMessage.success('创建成功')
+    newFolderVisible.value = false
+    loadFileList()
+  } catch (err) {
+    ElMessage.error('创建失败')
+  }
+}
+
+const handleRefresh = () => {
+  loadFileList()
+}
+
+const handleGoUp = () => {
+  if (currentPath.value === INITIAL_PATH) return
+  const sep = currentPath.value.includes('/') ? '/' : '\\'
+  const lastIndex = currentPath.value.lastIndexOf(sep)
+  if (lastIndex > -1) {
+    const parentPath = currentPath.value.substring(0, lastIndex)
+    if (parentPath.length >= INITIAL_PATH.length) {
+       currentPath.value = parentPath
+       loadFileList()
+    }
+  }
+}
+
+const formatSize = (bytes) => {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+}
+
+const formatDate = (timestamp) => {
+  return new Date(timestamp).toLocaleString('zh-CN')
+}
 const percent=ref(0)
 const timer=ref(null)
 /** 下载详情中的文件 */
 const handleDownloadDetailFile = async (row) => {
   const target = row || detailFile.value
   if (!target || !target.dataFilePath) return
-  
+
   try {
     const res = await submitDownloadTask([target.dataFilePath])
     const taskKey = res.data
@@ -801,7 +1044,7 @@ const handleDownloadDetailFile = async (row) => {
 }
 function pollProgress(taskKey) {
     if (timer.value) clearInterval(timer.value)
-    
+
     const loadingInstance = ElLoading.service({
         lock: true,
         text: '正在打包下载，请稍候...',
@@ -810,7 +1053,7 @@ function pollProgress(taskKey) {
 
     timer.value = setInterval(() => {
         getDownloadTaskStatus(taskKey).then(res => {
-          if (res.code !== 200) { 
+          if (res.code !== 200) {
             clearInterval(timer.value);
             loadingInstance.close();
             ElMessage.error(res.msg);
@@ -835,12 +1078,12 @@ function pollProgress(taskKey) {
 
 function transformTreeData(data) {
     if (!data || !Array.isArray(data)) return []
-    
+
     return data.map(item => ({
         ...item,
         label: item.name, // 为树形组件添加label字段
-        children: item.children && item.children.length > 0 
-            ? transformTreeData(item.children) 
+        children: item.children && item.children.length > 0
+            ? transformTreeData(item.children)
             : []
     }))
 }
@@ -911,6 +1154,25 @@ function handleSelectionChange(selection) {
   ids.value = selection.map(item => item.id)
   single.value = selection.length != 1
   multiple.value = !selection.length
+}
+
+/** 按钮操作：添加仿真数据 */
+function handleAddSimulationData() {
+  // TODO: 在这里编写你的业务逻辑
+  // 比如打开一个弹窗： open.value = true; title.value = "添加仿真数据";
+  console.log("点击了添加仿真数据");
+}
+
+/** 按钮操作：添加项目信息 */
+function handleAddProjectInfo() {
+  // TODO: 在这里编写你的业务逻辑
+  console.log("点击了添加项目信息");
+}
+
+/** 按钮操作：添加试验信息 */
+function handleAddExperimentInfo() {
+  // TODO: 在这里编写你的业务逻辑
+  console.log("点击了添加试验信息");
 }
 
 /** 删除按钮操作 */
@@ -990,7 +1252,6 @@ function getList(){
 onMounted(()=>{
     getList()
     getTreeData()
-    getProjects()
 })
 
 </script>

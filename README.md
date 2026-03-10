@@ -6,7 +6,7 @@
 
 - **基础框架**: Spring Boot + Vue3.js
 - **核心架构**: 前后端分离
-- **数据库**: MySQL
+- **数据库**: 达梦数据库
 - **权限控制**: Spring Security + JWT
 
 ## 🚀 快速启动
@@ -14,7 +14,7 @@
 ### 环境要求
 
 - JDK 1.8 或更高版本
-- MySQL 5.7 或更高版本
+- 达梦数据库 8 或更高版本
 - Redis 3.0 或更高版本
 - Maven 3.0+
 - Node.js 12.0+ (前端运行需要)
@@ -35,7 +35,7 @@
 
 ### 第二步：后端配置与启动
 
-1. 修改配置文件
+1. 修改配置文件（不用改）
    - 打开 `/ruoyi-admin/src/main/resources/`
    - 复制 `application-druid.yml.example` 为 `application-druid.yml`
    - 修改数据库连接信息：
@@ -104,15 +104,16 @@
 
 ### 项目结构
 ```
-ruoyi/
+/RuoY
 ├── ruoyi-admin          # 后台服务端
 ├── ruoyi-common         # 通用模块
 ├── ruoyi-framework      # 核心框架
 ├── ruoyi-generator      # 代码生成器
 ├── ruoyi-quartz         # 定时任务
 ├── ruoyi-system         # 系统模块
-├── ruoyi-ui             # 前端界面
 └── sql/                 # 数据库脚本
+
+/RuoYi-Vue3              # 前端界面
 ```
 
 ### 新增模块
@@ -129,7 +130,7 @@ ruoyi/
 ## ⚙️ 常见问题
 
 ### 1. 启动时报数据库连接错误
-- 检查MySQL服务是否启动
+- 检查达梦数据库服务是否启动
 - 确认数据库用户权限
 - 检查防火墙设置
 
