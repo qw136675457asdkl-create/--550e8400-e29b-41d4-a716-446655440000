@@ -65,3 +65,12 @@ export function previewData(data) {
     data: data
   })
 }
+
+export function downloadData(data) {
+  return request({
+    url: '/data/bussiness/download',
+    method: 'post',
+    data: data,
+    responseType: 'blob'
+  })
+}

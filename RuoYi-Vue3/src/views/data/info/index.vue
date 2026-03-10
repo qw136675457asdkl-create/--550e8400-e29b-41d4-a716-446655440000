@@ -1,6 +1,7 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
+    <div class="search-panel">
+    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px" class="search-form">
       <el-form-item label="编号" prop="id">
         <el-input
           v-model="queryParams.id"
@@ -36,17 +37,19 @@
         >
         </el-date-picker>
       </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
-        <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+      <el-form-item class="search-actions">
+        <el-button type="primary" icon="Search" class="search-btn search-btn--primary" @click="handleQuery">搜索</el-button>
+        <el-button icon="Refresh" class="search-btn search-btn--default" @click="resetQuery">重置</el-button>
       </el-form-item>
     </el-form>
+    </div>
 
-    <el-row :gutter="10" class="mb8">
+    <div class="table-panel">
+    <el-row :gutter="10" class="mb8 table-toolbar">
       <el-col :span="1.5">
         <el-button
           type="primary"
-          plain
+          class="toolbar-btn toolbar-btn--primary"
           icon="Plus"
           @click="handleAdd"
           v-hasPermi="['data:info:add']"
@@ -55,7 +58,7 @@
       <el-col :span="1.5">
         <el-button
           type="primary"
-          plain
+          class="toolbar-btn toolbar-btn--primary"
           icon="Plus"
           @click="handleAddExperiment"
           v-hasPermi="['data:info:add']"
@@ -63,16 +66,14 @@
       </el-col>
       <el-col :span="1.5">
         <el-button
-          type="info"
-          plain
+          class="toolbar-btn toolbar-btn--light"
           icon="Sort"
           @click="toggleExpandAll"
         >展开/折叠</el-button>
       </el-col>
       <el-col :span="1.5">
         <el-button
-          type="danger"
-          plain
+          class="toolbar-btn toolbar-btn--danger"
           icon="Delete"
           :disabled="multiple"
           @click="handleDelete()"
@@ -82,6 +83,7 @@
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
+    <div class="info-table-wrap">
     <el-table
       v-if="refreshTable"
       v-loading="loading"
@@ -117,26 +119,43 @@
         </template>
       </el-table-column>
       <el-table-column label="路径" align="center" prop="path" :show-overflow-tooltip="true" />
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="210">
         <template #default="scope">
-          <el-tooltip content="详情" placement="top">
-            <el-button link type="primary" icon="View" @click="handleView(scope.row)" v-hasPermi="['data:info:query']"></el-button>
-          </el-tooltip>
-          <el-tooltip content="修改" placement="top">
-            <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['data:info:edit']"></el-button>
-          </el-tooltip>
-          <el-tooltip content="删除" placement="top">
-            <el-button link type="danger" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['data:info:remove']"></el-button>
-          </el-tooltip>
+          <div class="action-group">
+            <el-tooltip content="详情" placement="top">
+              <el-button size="small" class="action-btn action-btn--primary" @click="handleView(scope.row)" v-hasPermi="['data:info:query']">详情</el-button>
+            </el-tooltip>
+            <el-tooltip content="修改" placement="top">
+              <el-button size="small" class="action-btn action-btn--muted" @click="handleUpdate(scope.row)" v-hasPermi="['data:info:edit']">编辑</el-button>
+            </el-tooltip>
+            <el-tooltip content="删除" placement="top">
+              <el-button size="small" class="action-btn action-btn--danger" @click="handleDelete(scope.row)" v-hasPermi="['data:info:remove']">删除</el-button>
+            </el-tooltip>
+          </div>
         </template>
       </el-table-column>
     </el-table>
+    </div>
+    </div>
 
     <!-- 添加或修改试验信息主对话框 -->
-    <el-dialog :title="title" v-model="open" width="500px" append-to-body>
-      <el-form ref="infoRef" :model="form" :rules="rules" label-width="80px">
+    <el-dialog
+      :title="title"
+      v-model="open"
+      width="560px"
+      class="ant-form-dialog"
+      :close-on-click-modal="!submitLoading"
+      :close-on-press-escape="!submitLoading"
+      append-to-body
+    >
+      <el-form ref="infoRef" :model="form" :rules="rules" label-width="84px" class="ant-form-layout">
         <el-form-item label="名称" prop="name">
           <el-input v-model="form.name" placeholder="请输入名称"/>
+          <template #error="{ error }">
+            <transition name="form-error-slide">
+              <div v-if="error" class="form-error-tip">{{ error }}</div>
+            </transition>
+          </template>
         </el-form-item>
         <el-form-item label="所属项目" prop="parentId" v-if="form.type === 'experiment'">
           <el-select v-model="form.parentId" placeholder="请选择所属项目" filterable clearable>
@@ -147,6 +166,11 @@
               :value="item.projectId"
             />
           </el-select>
+          <template #error="{ error }">
+            <transition name="form-error-slide">
+              <div v-if="error" class="form-error-tip">{{ error }}</div>
+            </transition>
+          </template>
         </el-form-item>
        <el-form-item label="试验目标" prop="targetId" v-if="form.type === 'experiment'">
           <el-select v-model="form.targetId" placeholder="请选择试验目标">
@@ -157,6 +181,11 @@
               :value="item.targetId"
             />
           </el-select>
+          <template #error="{ error }">
+            <transition name="form-error-slide">
+              <div v-if="error" class="form-error-tip">{{ error }}</div>
+            </transition>
+          </template>
         </el-form-item>
         <el-form-item label="试验日期" prop="startTime" v-if="form.type === 'experiment'">
           <el-date-picker clearable
@@ -165,12 +194,34 @@
             value-format="YYYY-MM-DD"
             placeholder="选择开始日期">
           </el-date-picker>
+          <template #error="{ error }">
+            <transition name="form-error-slide">
+              <div v-if="error" class="form-error-tip">{{ error }}</div>
+            </transition>
+          </template>
         </el-form-item>
         <el-form-item label="试验地点" prop="location" v-if="form.type === 'experiment'">
           <el-input v-model="form.location" placeholder="请输入地点" />
+          <template #error="{ error }">
+            <transition name="form-error-slide">
+              <div v-if="error" class="form-error-tip">{{ error }}</div>
+            </transition>
+          </template>
         </el-form-item>
         <el-form-item label="内容描述" prop="contentDesc">
-          <el-input v-model="form.contentDesc" type="textarea" placeholder="请输入内容" />
+          <el-input
+            v-model="form.contentDesc"
+            type="textarea"
+            :maxlength="200"
+            show-word-limit
+            :autosize="{ minRows: 4, maxRows: 6 }"
+            placeholder="请输入内容"
+          />
+          <template #error="{ error }">
+            <transition name="form-error-slide">
+              <div v-if="error" class="form-error-tip">{{ error }}</div>
+            </transition>
+          </template>
         </el-form-item>
         <el-form-item label="创建人" prop="createBy" v-if="form.createBy">
           <el-input :model-value="form.createBy" disabled />
@@ -195,32 +246,101 @@
       </el-form>
       <template #footer>
         <div class="dialog-footer">
-          <el-button type="primary" @click="submitForm">确 定</el-button>
-          <el-button @click="cancel">取 消</el-button>
+          <el-button type="primary" class="ant-confirm-btn" :loading="submitLoading" @click="submitForm">确 定</el-button>
+          <el-button class="ant-cancel-btn" :disabled="submitLoading" @click="cancel">取 消</el-button>
         </div>
       </template>
     </el-dialog>
 
-    <!-- 详情对话框 -->
-    <el-dialog title="详情" v-model="openView" width="500px" append-to-body>
-      <el-form :model="form" label-width="80px">
-        <el-form-item label="编号">{{ form.id }}</el-form-item>
-        <el-form-item label="名称">{{ form.name }}</el-form-item>
-        <el-form-item label="目标" v-if="form.targetType">{{ form.targetType }}</el-form-item>
-        <el-form-item label="类型">{{ form.type }}</el-form-item>
-        <el-form-item label="路径">{{ form.path }}</el-form-item>
-        <el-form-item label="地点">{{ form.location }}</el-form-item>
-        <el-form-item label="时间">{{ formatStartTime(form.startTime) }}</el-form-item>
-        <el-form-item label="创建人">{{ form.createBy || '暂无创建人' }}</el-form-item>
-        <el-form-item label="创建时间">{{ form.createTime }}</el-form-item>
-        <el-form-item label="内容描述">{{ form.contentDesc }}</el-form-item>
-      </el-form>
-      <template #footer>
-        <div class="dialog-footer">
+    <!-- 详情抽屉 -->
+    <el-drawer
+      v-model="openView"
+      direction="rtl"
+      size="520px"
+      class="info-detail-drawer"
+      append-to-body
+      :with-header="false"
+    >
+      <div class="detail-drawer">
+        <div class="detail-drawer__header">
+          <div class="detail-drawer__title-row">
+            <h3 class="detail-drawer__title">详情信息</h3>
+            <el-tag class="detail-status-tag" :type="getDetailStatusType()" effect="dark">
+              {{ getDetailStatusText() }}
+            </el-tag>
+          </div>
+          <p class="detail-drawer__id">编号：{{ form.id || '--' }}</p>
+        </div>
+
+        <transition name="drawer-content-fade" appear>
+          <div v-if="openView" class="detail-drawer__body">
+            <el-card class="detail-card" shadow="hover">
+              <template #header>
+                <div class="detail-card__header">基础信息</div>
+              </template>
+              <div class="detail-grid">
+                <div class="detail-item">
+                  <span class="detail-label">名称</span>
+                  <span class="detail-value">{{ form.name || '--' }}</span>
+                </div>
+                <div class="detail-item" v-if="form.targetType">
+                  <span class="detail-label">目标</span>
+                  <span class="detail-value">{{ form.targetType }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">类型</span>
+                  <span class="detail-value">{{ getTypeLabel(form.type) }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">地点</span>
+                  <span class="detail-value">{{ form.location || '--' }}</span>
+                </div>
+              </div>
+            </el-card>
+
+            <el-card class="detail-card" shadow="hover">
+              <template #header>
+                <div class="detail-card__header">时间与人员</div>
+              </template>
+              <div class="detail-grid">
+                <div class="detail-item">
+                  <span class="detail-label">时间</span>
+                  <span class="detail-value">{{ formatStartTime(form.startTime) || '--' }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">创建时间</span>
+                  <span class="detail-value">{{ form.createTime || '--' }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">创建人</span>
+                  <span class="detail-value">{{ form.createBy || '暂无创建人' }}</span>
+                </div>
+              </div>
+            </el-card>
+
+            <el-card class="detail-card" shadow="hover">
+              <template #header>
+                <div class="detail-card__header">附加信息</div>
+              </template>
+              <div class="detail-stack">
+                <div class="detail-item detail-item--column">
+                  <span class="detail-label">路径</span>
+                  <span class="detail-value">{{ form.path || '--' }}</span>
+                </div>
+                <div class="detail-item detail-item--column">
+                  <span class="detail-label">内容描述</span>
+                  <span class="detail-value">{{ form.contentDesc || '--' }}</span>
+                </div>
+              </div>
+            </el-card>
+          </div>
+        </transition>
+
+        <div class="detail-drawer__footer">
           <el-button @click="openView = false">关 闭</el-button>
         </div>
-      </template>
-    </el-dialog>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -244,6 +364,7 @@ const dateRange = ref([])
 const infoTableRef = ref(null)
 const multiple = ref(true)
 const selectedRows = ref([])
+const submitLoading = ref(false)
 const isAdd = computed(() => {
   return title.value === '添加项目' || title.value === '添加试验';
 });
@@ -276,6 +397,9 @@ const data = reactive({
     ],
     contentDesc: [
       { required: true, message: "内容描述不能为空", trigger: "blur" }
+    ],
+    path: [
+      { required: true, message: "路径不能为空", trigger: "blur" }
     ]
   }
 })
@@ -320,6 +444,21 @@ function cellStyle({ row, column, rowIndex, columnIndex }) {
   if (column.property === 'id') {
     return { textAlign: row.type === 'project' ? 'left' : 'center' };
   }
+}
+
+/** 详情抽屉展示文案 */
+function getTypeLabel(type) {
+  if (type === 'project') return '项目'
+  if (type === 'experiment') return '试验'
+  return type || '--'
+}
+
+function getDetailStatusText() {
+  return form.value?.createTime ? '已处理' : '待处理'
+}
+
+function getDetailStatusType() {
+  return form.value?.createTime ? 'success' : 'warning'
 }
 
 /** 搜索按钮操作 */
@@ -457,27 +596,31 @@ function handleView(row) {
 
 /** 提交按钮 */
 function submitForm() {
-  proxy.$refs["infoRef"].validate(valid => {
-    if (valid) {
+  if (submitLoading.value) return
+  proxy.$refs["infoRef"].validate(async valid => {
+    if (!valid) return
+    submitLoading.value = true
+    try {
+      // 模拟确认按钮的加载反馈
+      await new Promise(resolve => setTimeout(resolve, 500))
+
       // 在提交前格式化startTime为 yyyy-MM-dd 格式
       const submitData = JSON.parse(JSON.stringify(form.value))
       if (submitData.startTime) {
         submitData.startTime = formatDateForSubmit(submitData.startTime)
       }
-      
+
       if (submitData.id != null && title.value.startsWith("修改")) {
-        updateInfo(submitData).then(response => {
-          proxy.$modal.msgSuccess("修改成功")
-          open.value = false
-          getList()
-        })
+        await updateInfo(submitData)
+        proxy.$modal.msgSuccess("修改成功")
       } else {
-        addInfo(submitData).then(response => {
-          proxy.$modal.msgSuccess("新增成功")
-          open.value = false
-          getList()
-        })
+        await addInfo(submitData)
+        proxy.$modal.msgSuccess("新增成功")
       }
+      open.value = false
+      getList()
+    } finally {
+      submitLoading.value = false
     }
   })
 }
@@ -665,4 +808,570 @@ getList()
 </script>
 
 <style scoped>
+.app-container {
+  padding: 12px;
+  background: #edf2f8;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.app-container > * {
+  position: relative;
+  z-index: 1;
+}
+
+.app-container::before,
+.app-container::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.4;
+  will-change: background-position, opacity, transform;
+}
+
+.app-container::before {
+  left: -12px;
+  width: 178px;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 240'%3E%3Cpath d='M22 0 C28 20 16 40 22 60 C28 80 16 100 22 120 C28 140 16 160 22 180 C28 200 16 220 22 240' fill='none' stroke='%231890ff' stroke-opacity='0.22' stroke-width='0.8'/%3E%3Cpath d='M34 0 C40 20 28 40 34 60 C40 80 28 100 34 120 C40 140 28 160 34 180 C40 200 28 220 34 240' fill='none' stroke='%231890ff' stroke-opacity='0.16' stroke-width='0.7'/%3E%3Cpath d='M46 0 C52 20 40 40 46 60 C52 80 40 100 46 120 C52 140 40 160 46 180 C52 200 40 220 46 240' fill='none' stroke='%231890ff' stroke-opacity='0.12' stroke-width='0.65'/%3E%3Cpath d='M58 0 C64 20 52 40 58 60 C64 80 52 100 58 120 C64 140 52 160 58 180 C64 200 52 220 58 240' fill='none' stroke='%231890ff' stroke-opacity='0.1' stroke-width='0.6'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 280'%3E%3Cpath d='M14 0 C22 26 8 52 14 78 C22 104 8 130 14 156 C22 182 8 208 14 234 C22 256 8 268 14 280' fill='none' stroke='%231890ff' stroke-opacity='0.08' stroke-width='0.8'/%3E%3Cpath d='M74 0 C82 26 68 52 74 78 C82 104 68 130 74 156 C82 182 68 208 74 234 C82 256 68 268 74 280' fill='none' stroke='%231890ff' stroke-opacity='0.06' stroke-width='0.75'/%3E%3C/svg%3E"),
+    linear-gradient(90deg, rgba(24, 144, 255, 0.06) 0%, rgba(24, 144, 255, 0.02) 65%, rgba(24, 144, 255, 0) 100%);
+  background-repeat: repeat-y, repeat-y, no-repeat;
+  background-size: 178px 240px, 178px 280px, 100% 100%;
+  background-position: 0 0, 0 120px, 0 0;
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 62%, transparent 100%);
+  mask-image: linear-gradient(90deg, #000 0%, #000 62%, transparent 100%);
+  animation: flowEdgeLeft 60s linear infinite;
+}
+
+.app-container::after {
+  right: -14px;
+  width: 196px;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 240'%3E%3Cpath d='M178 0 C172 20 184 40 178 60 C172 80 184 100 178 120 C172 140 184 160 178 180 C172 200 184 220 178 240' fill='none' stroke='%231890ff' stroke-opacity='0.22' stroke-width='0.8'/%3E%3Cpath d='M166 0 C160 20 172 40 166 60 C160 80 172 100 166 120 C160 140 172 160 166 180 C160 200 172 220 166 240' fill='none' stroke='%231890ff' stroke-opacity='0.16' stroke-width='0.7'/%3E%3Cpath d='M154 0 C148 20 160 40 154 60 C148 80 160 100 154 120 C148 140 160 160 154 180 C148 200 160 220 154 240' fill='none' stroke='%231890ff' stroke-opacity='0.12' stroke-width='0.65'/%3E%3Cpath d='M142 0 C136 20 148 40 142 60 C136 80 148 100 142 120 C136 140 148 160 142 180 C136 200 148 220 142 240' fill='none' stroke='%231890ff' stroke-opacity='0.1' stroke-width='0.6'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 280'%3E%3Cpath d='M188 0 C180 26 194 52 188 78 C180 104 194 130 188 156 C180 182 194 208 188 234 C180 256 194 268 188 280' fill='none' stroke='%231890ff' stroke-opacity='0.08' stroke-width='0.8'/%3E%3Cpath d='M126 0 C118 26 132 52 126 78 C118 104 132 130 126 156 C118 182 132 208 126 234 C118 256 132 268 126 280' fill='none' stroke='%231890ff' stroke-opacity='0.06' stroke-width='0.75'/%3E%3C/svg%3E"),
+    linear-gradient(270deg, rgba(24, 144, 255, 0.06) 0%, rgba(24, 144, 255, 0.02) 65%, rgba(24, 144, 255, 0) 100%);
+  background-repeat: repeat-y, repeat-y, no-repeat;
+  background-size: 196px 240px, 196px 280px, 100% 100%;
+  background-position: 0 0, 0 90px, 0 0;
+  -webkit-mask-image: linear-gradient(270deg, #000 0%, #000 62%, transparent 100%);
+  mask-image: linear-gradient(270deg, #000 0%, #000 62%, transparent 100%);
+  animation: flowEdgeRight 60s linear infinite;
+}
+
+@keyframes flowEdgeLeft {
+  0% {
+    background-position: 0 0, 0 120px, 0 0;
+    opacity: 0.32;
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    background-position: 0 140px, 0 20px, 0 0;
+    opacity: 0.5;
+    transform: translate3d(2px, 0, 0);
+  }
+  100% {
+    background-position: 0 280px, 0 -80px, 0 0;
+    opacity: 0.32;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes flowEdgeRight {
+  0% {
+    background-position: 0 0, 0 90px, 0 0;
+    opacity: 0.3;
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    background-position: 0 -130px, 0 180px, 0 0;
+    opacity: 0.48;
+    transform: translate3d(-2px, 0, 0);
+  }
+  100% {
+    background-position: 0 -260px, 0 270px, 0 0;
+    opacity: 0.3;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.search-panel,
+.table-panel {
+  background: #fff;
+  border: 1px solid #e6ebf2;
+  border-radius: 2px;
+}
+
+.search-panel {
+  padding: 14px 16px 8px;
+  margin-bottom: 12px;
+}
+
+.search-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+}
+
+.search-form :deep(.el-form-item) {
+  margin-bottom: 12px;
+}
+
+.search-form :deep(.el-form-item__label) {
+  color: #606a78;
+  font-weight: 500;
+}
+
+.search-form :deep(.el-input__wrapper),
+.search-form :deep(.el-date-editor.el-input__wrapper) {
+  box-shadow: 0 0 0 1px #dfe5ee inset;
+  border-radius: 2px;
+}
+
+.search-form :deep(.el-input__wrapper.is-focus),
+.search-form :deep(.el-date-editor.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px #1890ff inset;
+}
+
+.search-form :deep(.el-date-editor) {
+  width: 308px;
+}
+
+.search-actions {
+  padding-left: 12px;
+}
+
+.search-btn {
+  border-radius: 2px;
+  min-width: 72px;
+}
+
+.search-btn--primary {
+  border-color: #1890ff;
+  background: #1890ff;
+}
+
+.search-btn--default {
+  color: #717b8b;
+  border-color: #cfd7e3;
+  background: #f1f4f8;
+}
+
+.search-btn--default:hover,
+.search-btn--default:focus {
+  color: #5f6978;
+  border-color: #bcc7d6;
+  background: #e8edf4;
+}
+
+.table-panel {
+  padding: 12px 12px 8px;
+}
+
+.table-toolbar {
+  margin-bottom: 10px;
+}
+
+.table-toolbar :deep(.el-col) {
+  max-width: none;
+}
+
+.toolbar-btn {
+  min-width: 82px;
+  border-radius: 2px;
+}
+
+.toolbar-btn--primary {
+  color: #fff;
+  border-color: #1890ff;
+  background: #1890ff;
+}
+
+.toolbar-btn--primary:hover,
+.toolbar-btn--primary:focus {
+  color: #fff;
+  border-color: #40a9ff;
+  background: #40a9ff;
+}
+
+.toolbar-btn--light {
+  color: #5f6978;
+  border-color: #d7dee9;
+  background: #f7f9fc;
+}
+
+.toolbar-btn--light:hover,
+.toolbar-btn--light:focus {
+  color: #3d4756;
+  border-color: #c5cedb;
+  background: #eff3f8;
+}
+
+.toolbar-btn--danger {
+  color: #5f6978;
+  border-color: #d7dee9;
+  background: #f7f9fc;
+}
+
+.toolbar-btn--danger:hover,
+.toolbar-btn--danger:focus {
+  color: #ef4444;
+  border-color: #ef4444;
+  background: #fff7f7;
+}
+
+.info-table-wrap {
+  margin-bottom: 6px;
+}
+
+.info-table-wrap :deep(.el-table) {
+  border: 1px solid #e6ebf2;
+  border-radius: 2px;
+}
+
+.info-table-wrap :deep(.el-table__header th.el-table__cell) {
+  height: 40px;
+  color: #525f70;
+  font-weight: 600;
+  background: #f4f7fb;
+}
+
+.info-table-wrap :deep(.el-table .el-table__cell) {
+  border-bottom-color: #edf1f6;
+}
+
+.info-table-wrap :deep(.el-table__row td.el-table__cell) {
+  height: 42px;
+  color: #586375;
+}
+
+.info-table-wrap :deep(.el-table__body tr:hover > td.el-table__cell) {
+  background: #f7fbff;
+}
+
+.info-table-wrap :deep(.el-table__body tr.current-row > td.el-table__cell) {
+  background: #eef5ff;
+}
+
+.action-btn {
+  min-width: 52px;
+  padding: 2px 12px;
+  font-size: 12px;
+  border-radius: 2px;
+}
+
+.action-group {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+
+.action-btn--primary {
+  color: #fff;
+  border-color: #1890ff;
+  background: #1890ff;
+}
+
+.action-btn--primary:hover,
+.action-btn--primary:focus {
+  color: #fff;
+  border-color: #40a9ff;
+  background: #40a9ff;
+}
+
+.ant-form-dialog :deep(.el-dialog) {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ant-form-dialog :deep(.el-dialog__header) {
+  margin: 0;
+  padding: 22px 24px 10px;
+  border-bottom: none;
+}
+
+.ant-form-dialog :deep(.el-dialog__title) {
+  color: #1f2d3d;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.ant-form-dialog :deep(.el-dialog__body) {
+  padding: 10px 24px 8px;
+}
+
+.ant-form-dialog :deep(.el-dialog__footer) {
+  padding: 6px 24px 22px;
+  border-top: none;
+}
+
+.ant-form-layout :deep(.el-form-item) {
+  margin-bottom: 20px;
+}
+
+.ant-form-layout :deep(.el-form-item__label) {
+  color: #1f2d3d;
+  font-weight: 500;
+}
+
+.ant-form-layout :deep(.el-input__wrapper),
+.ant-form-layout :deep(.el-textarea__inner),
+.ant-form-layout :deep(.el-select__wrapper),
+.ant-form-layout :deep(.el-date-editor.el-input__wrapper) {
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px #d9d9d9 inset;
+  transition: all 0.2s ease;
+}
+
+.ant-form-layout :deep(.el-input__wrapper.is-focus),
+.ant-form-layout :deep(.el-select__wrapper.is-focused),
+.ant-form-layout :deep(.el-date-editor.el-input__wrapper.is-focus),
+.ant-form-layout :deep(.el-textarea__inner:focus) {
+  box-shadow: 0 0 0 1px #1890ff inset, 0 0 0 3px rgba(24, 144, 255, 0.15);
+}
+
+.ant-form-layout :deep(.el-textarea__inner) {
+  padding: 10px 12px 22px;
+}
+
+.ant-form-layout :deep(.el-input__count) {
+  right: 10px;
+  bottom: 6px;
+  color: #8c8c8c;
+  background: transparent;
+}
+
+.ant-confirm-btn {
+  min-width: 90px;
+  border-radius: 8px;
+  border-color: #1890ff;
+  background: #1890ff;
+}
+
+.ant-confirm-btn:hover,
+.ant-confirm-btn:focus {
+  border-color: #40a9ff;
+  background: #40a9ff;
+}
+
+.ant-cancel-btn {
+  min-width: 88px;
+  border-radius: 8px;
+}
+
+.form-error-tip {
+  margin-top: 4px;
+  color: #ff4d4f;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.form-error-slide-enter-active,
+.form-error-slide-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.form-error-slide-enter-from,
+.form-error-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+.action-btn--muted {
+  color: #717b8b;
+  border-color: #cfd7e3;
+  background: #f1f4f8;
+}
+
+.action-btn--muted:hover,
+.action-btn--muted:focus {
+  color: #5f6978;
+  border-color: #bcc7d6;
+  background: #e8edf4;
+}
+
+.action-btn--danger {
+  color: #5f6978;
+  border-color: #d7dee9;
+  background: #f7f9fc;
+}
+
+.action-btn--danger:hover,
+.action-btn--danger:focus {
+  color: #ef4444;
+  border-color: #ef4444;
+  background: #fff7f7;
+}
+
+.info-detail-drawer :deep(.el-drawer__body) {
+  padding: 0;
+}
+
+.detail-drawer {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #f4f7fb;
+}
+
+.detail-drawer__header {
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid #e8edf5;
+  background: #fff;
+}
+
+.detail-drawer__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.detail-drawer__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #2f3a4a;
+}
+
+.detail-status-tag {
+  flex-shrink: 0;
+}
+
+.detail-drawer__id {
+  margin: 10px 0 0;
+  color: #5c6778;
+  font-size: 14px;
+}
+
+.detail-drawer__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.detail-card {
+  border: 1px solid #e5ebf3;
+}
+
+.detail-card :deep(.el-card__header) {
+  padding: 12px 16px;
+  border-bottom: 1px solid #edf1f6;
+}
+
+.detail-card :deep(.el-card__body) {
+  padding: 16px;
+}
+
+.detail-card__header {
+  font-size: 14px;
+  font-weight: 600;
+  color: #3d4a5d;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 16px;
+}
+
+.detail-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.detail-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.6;
+}
+
+.detail-item--column {
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-label {
+  min-width: 72px;
+  color: #8a94a6;
+  font-size: 13px;
+}
+
+.detail-value {
+  color: #2f3a4a;
+  font-size: 14px;
+  word-break: break-all;
+}
+
+.detail-drawer__footer {
+  padding: 14px 20px;
+  border-top: 1px solid #e8edf5;
+  background: #fff;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.drawer-content-fade-enter-active,
+.drawer-content-fade-leave-active {
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.drawer-content-fade-enter-from,
+.drawer-content-fade-leave-to {
+  opacity: 0;
+  transform: translateX(10px);
+}
+
+:deep(.right-toolbar) {
+  margin-left: auto;
+}
+
+@media (max-width: 768px) {
+  .app-container::before,
+  .app-container::after {
+    content: none;
+  }
+
+  .app-container {
+    padding: 8px;
+  }
+
+  .search-form :deep(.el-form-item) {
+    width: 100%;
+  }
+
+  .search-actions {
+    padding-left: 0;
+  }
+
+  .table-toolbar :deep(.el-col) {
+    flex: 0 0 50%;
+    max-width: 50%;
+    margin-bottom: 8px;
+  }
+
+  .detail-drawer__header {
+    padding: 16px 16px 12px;
+  }
+
+  .detail-drawer__body {
+    padding: 14px;
+    gap: 14px;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

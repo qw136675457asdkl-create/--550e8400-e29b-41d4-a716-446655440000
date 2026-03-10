@@ -15,59 +15,79 @@
             <!-- 右侧内容栏 试验信息列表 -->
             <pane>
                 <div class="pane-content">
-                    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="88px">
-                        <el-form-item label="ID" prop="id">
-                            <el-input v-model="queryParams.id" placeholder="请输入数据ID" clearable style="width: 200px" @keyup.enter="handleQuery" />
-                        </el-form-item>
-                        <el-form-item label="数据名称" prop="dataName">
-                            <el-input v-model="queryParams.dataName" placeholder="请输入数据名称" clearable style="width: 200px" @keyup.enter="handleQuery" />
-                        </el-form-item>
-                        <el-form-item label="试验名称" prop="experimentName">
-                            <el-input v-model="queryParams.experimentName" placeholder="请输入试验名称" clearable style="width: 200px" @keyup.enter="handleQuery" />
-                        </el-form-item>
-                        <el-form-item label="所属项目" prop="projectId">
-                            <el-select v-model="queryParams.projectId" placeholder="请选择所属项目" clearable style="width: 200px">
-                                <el-option v-for="item in projectOptions" :key="item.projectId" :label="item.projectName" :value="item.projectId" />
-                            </el-select>
-                        </el-form-item>
-                        <el-form-item label="创建人" prop="createBy">
-                            <el-input v-model="queryParams.createBy" placeholder="请输入创建人" clearable style="width: 200px" @keyup.enter="handleQuery" />
-                        </el-form-item>
-                        <el-form-item label="是否模拟" prop="isSimulation">
-                            <el-select v-model="queryParams.isSimulation" placeholder="请选择数据类型" clearable style="width: 200px">
-                                <el-option label="真实" :value="true" />
-                                <el-option label="模拟" :value="false" />
-                            </el-select>
-                        </el-form-item>
-                        <el-form-item label="数据状态" prop="workStatus">
-                            <el-input v-model="queryParams.workStatus" placeholder="请输入数据状态" clearable style="width: 200px" @keyup.enter="handleQuery" />
-                        </el-form-item>
-                        <el-form-item label="创建时间" style="width: 308px">
-                            <el-date-picker
-                                v-model="dateRange"
-                                value-format="YYYY-MM-DD"
-                                type="daterange"
-                                range-separator="-"
-                                start-placeholder="开始日期"
-                                end-placeholder="结束日期"
-                            />
-                        </el-form-item>
-                    </el-form>
-                    <el-row :gutter="10" v-show="showSearch" style="margin-bottom: 10px;">
-                        <el-col :span="24">
-                            <div style="display: flex; justify-content: flex-start; gap: 10px;">
-                                <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
-                                <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+                    <div v-show="showSearch" class="query-section">
+                        <div class="query-main">
+                            <el-form :model="queryParams" ref="queryRef" :inline="true" label-width="88px" class="query-form">
+                                <el-form-item label="ID" prop="id">
+                                    <el-input v-model="queryParams.id" placeholder="请输入数据ID" clearable class="query-control" @keyup.enter="handleQuery" />
+                                </el-form-item>
+                                <el-form-item label="数据名称" prop="dataName">
+                                    <el-input v-model="queryParams.dataName" placeholder="请输入数据名称" clearable class="query-control" @keyup.enter="handleQuery" />
+                                </el-form-item>
+                                <el-form-item label="试验名称" prop="experimentName">
+                                    <el-input v-model="queryParams.experimentName" placeholder="请输入试验名称" clearable class="query-control" @keyup.enter="handleQuery" />
+                                </el-form-item>
+                                <el-form-item label="所属项目" prop="projectId">
+                                    <el-select v-model="queryParams.projectId" placeholder="请选择所属项目" clearable class="query-control">
+                                        <el-option v-for="item in projectOptions" :key="item.projectId" :label="item.projectName" :value="item.projectId" />
+                                    </el-select>
+                                </el-form-item>
+
+                                <template v-if="advancedSearchExpanded">
+                                    <el-form-item label="创建人" prop="createBy">
+                                        <el-input v-model="queryParams.createBy" placeholder="请输入创建人" clearable class="query-control" @keyup.enter="handleQuery" />
+                                    </el-form-item>
+                                    <el-form-item label="是否模拟" prop="isSimulation">
+                                        <el-select v-model="queryParams.isSimulation" placeholder="请选择数据类型" clearable class="query-control">
+                                            <el-option label="真实" :value="true" />
+                                            <el-option label="模拟" :value="false" />
+                                        </el-select>
+                                    </el-form-item>
+                                    <el-form-item label="数据状态" prop="workStatus">
+                                        <el-input v-model="queryParams.workStatus" placeholder="请输入数据状态" clearable class="query-control" @keyup.enter="handleQuery" />
+                                    </el-form-item>
+                                    <el-form-item label="创建时间" class="query-date-item">
+                                        <el-date-picker
+                                            v-model="dateRange"
+                                            value-format="YYYY-MM-DD"
+                                            type="daterange"
+                                            range-separator="-"
+                                            start-placeholder="开始日期"
+                                            end-placeholder="结束日期"
+                                            class="query-date-control"
+                                        />
+                                    </el-form-item>
+                                </template>
+                            </el-form>
+
+                            <div class="query-actions">
+                                <el-button-group class="query-action-group">
+                                    <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
+                                    <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+                                </el-button-group>
+                                <el-button
+                                    link
+                                    type="primary"
+                                    class="query-expand-btn"
+                                    :icon="advancedSearchExpanded ? ArrowUp : ArrowDown"
+                                    @click="toggleAdvancedSearch"
+                                >
+                                    {{ advancedSearchExpanded ? '收起' : '展开' }}
+                                </el-button>
                             </div>
-                        </el-col>
-                    </el-row>
-                    <el-row :gutter="10" class="mb8">
+                        </div>
+                    </div>
+
+                    <div v-show="showSearch" class="toolbar-divider"></div>
+
+                    <el-row :gutter="10" class="mb8 global-actions-row">
                         <el-col :span="1.5">
                             <el-button
                             type="primary"
                             plain
                             icon="Upload"
                             @click="openFileManager"
+                            v-hasPermi="['dataInfo:info:insert']"
                             >导入</el-button>
                         </el-col>
                         <el-col :span="1.5">
@@ -85,6 +105,7 @@
                             icon="Delete"
                             :disabled="multiple"
                             @click="handleDelete()"
+                            v-hasPermi="['dataInfo:info:delete']"
                             >删除</el-button>
                         </el-col>
                         <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
@@ -122,13 +143,13 @@
                         <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
                             <template #default="scope">
                             <el-tooltip content="详情" placement="top">
-                                <el-button link type="primary" icon="View" @click="handleView(scope.row)"></el-button>
+                                <el-button link type="primary" icon="View" @click="handleView(scope.row)" v-hasPermi="['dataInfo:info:query']"></el-button>
                             </el-tooltip>
                             <el-tooltip content="修改" placement="top">
-                                <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)"></el-button>
+                                <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['dataInfo:info:update']"></el-button>
                             </el-tooltip>
                             <el-tooltip content="删除" placement="top">
-                                <el-button link type="danger" icon="Delete" @click="handleDelete(scope.row)"></el-button>
+                                <el-button link type="danger" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['dataInfo:info:delete']"></el-button>
                             </el-tooltip>
                             </template>
                         </el-table-column>
@@ -381,25 +402,33 @@
         <!-- 业务数据详情 (文件预览) 对话框 -->
         <el-dialog v-model="detailVisible" :title="detailTitle" width="70%" append-to-body>
             <div v-if="detailFile">
-                <!-- CSV文件特殊处理 -->
-                <div v-if="detailFile.name.toLowerCase().endsWith('.csv') && detailFileInfo.isCsv">
-                    <el-table :data="detailFileInfo.csvData" border stripe height="500">
-                        <el-table-column 
-                            v-for="(header, index) in Object.keys(detailFileInfo.csvData[0] || {})" 
-                            :key="index"
-                            :prop="header"
-                            :label="header"
-                            show-overflow-tooltip
-                        />
-                    </el-table>
+                <!-- CSV/Excel走分页预览，避免一次性渲染造成卡顿 -->
+                <div v-if="isDetailTabularFile">
+                    <div v-loading="detailPreviewLoading">
+                        <el-table v-if="detailTableRows.length > 0" :data="detailTableRows" border stripe height="500">
+                            <el-table-column
+                                v-for="header in detailTableColumns"
+                                :key="header"
+                                :prop="header"
+                                :label="header"
+                                show-overflow-tooltip
+                            />
+                        </el-table>
+                        <el-empty v-else description="暂无预览数据" />
+                    </div>
+                    <pagination
+                        v-show="detailPreviewTotal > 0"
+                        :total="detailPreviewTotal"
+                        v-model:page="detailPreviewPageNum"
+                        v-model:limit="detailPreviewPageSize"
+                        @pagination="loadDetailTablePreview"
+                    />
                 </div>
-                <!-- 其他文件类型使用原有预览组件 -->
-                <component v-else :is="detailPreviewComponent" :file="detailFileInfo" />
             </div>
             <el-empty v-else description="暂无文件信息或路径无效" />
             <template #footer>
                 <div class="dialog-footer">
-                    <el-button type="primary" @click="handleDownloadDetailFile" v-if="detailFile">下 载</el-button>
+                    <el-button type="primary" @click="handleDownloadDetailFile(detailFile)" v-if="detailFile" v-hasPermi="['dataInfo:info:download']">下 载</el-button>
                     <el-button @click="detailVisible = false">关 闭</el-button>
                 </div>
             </template>
@@ -419,11 +448,11 @@
 import useAppStore from '@/store/modules/app'
 import {Splitpanes, Pane} from 'splitpanes'
 import 'splitpanes/dist/splitpanes.css'
-import {getExperimentList,getdataList,getdataDetail,updatedata,deldata,adddata,previewData} from '@/api/data/bussiness'
+import {getExperimentList,getdataList,getdataDetail,updatedata,deldata,adddata,previewData,downloadData} from '@/api/data/bussiness'
 import {getInfo} from "@/api/data/info"
-import { addDateRange } from "@/utils/ruoyi"
+import { addDateRange, blobValidate } from "@/utils/ruoyi"
 import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
-import { UploadFilled, Folder as ElIconFolder, Document as ElIconDocument, ArrowUp } from '@element-plus/icons-vue'
+import { UploadFilled, Folder as ElIconFolder, Document as ElIconDocument, ArrowUp, ArrowDown } from '@element-plus/icons-vue'
 import ImageViewer from '@/views/viewer/ImageViewer.vue'
 import VideoViewer from '@/views/viewer/VideoViewer.vue'
 import TextViewer from '@/views/viewer/TextViewer.vue'
@@ -431,7 +460,8 @@ import JsonViewer from '@/views/viewer/JsonViewer.vue'
 import BinaryViewer from '@/views/viewer/BinaryViewer.vue'
 import PDFViewer from '@/views/viewer/PDFViewer.vue'
 import ExcelViewer from '@/views/viewer/ExcelViewer.vue'
-import { submitDownloadTask, getDownloadTaskStatus, downloadFile } from '@/api/file'
+import { saveAs } from 'file-saver'
+import { submitDownloadTask, getDownloadTaskStatus } from '@/api/file'
 const dateRange = ref([])
 const { proxy } = getCurrentInstance()
 const treeTableOptions = ref(undefined)
@@ -446,6 +476,7 @@ const title = ref("")
 const name = ref('')
 const loading = ref(false)
 const showSearch = ref(true)
+const advancedSearchExpanded = ref(false)
 const total = ref(0)
 const businessList = ref([])
 const ids = ref([])
@@ -468,6 +499,11 @@ const uploadDataFormRef = ref(null)
 const detailVisible = ref(false)
 const detailFile = ref(null)
 const detailTitle = ref("文件预览")
+const detailPreviewLoading = ref(false)
+const detailPreviewPageNum = ref(1)
+const detailPreviewPageSize = ref(200)
+const detailPreviewTotal = ref(0)
+const detailTableRows = ref([])
 
 /** 打开文件管理器 (导入) */
 function openFileManager() {
@@ -552,39 +588,6 @@ const data = reactive({
         ]
     }
 })
-const experimentform = reactive({
-    id: null,
-    name: null,
-    parentId: null,
-    targetId: null,
-    startTime: null,
-    location: null,
-    contentDesc: null,
-    path: null
-})
-const experimentRules = {
-     id: [
-      { required: true, message: "编号不能为空", trigger: "blur" }
-    ],
-    name: [
-      { required: true, message: "名称不能为空", trigger: "blur" }
-    ],
-    parentId: [
-      { required: true, message: "所属项目不能为空", trigger: "change" }
-    ],
-    startTime: [
-      { required: true, message: "时间不能为空", trigger: "blur" }
-    ],
-    targetId: [
-      { required: true, message: "试验目标不能为空", trigger: "change" }
-    ],
-    location: [
-      { required: true, message: "地点不能为空", trigger: "blur" }
-    ],
-    contentDesc: [
-      { required: true, message: "内容描述不能为空", trigger: "blur" }
-    ]
-}
 
 const {queryParams, form, rules} = toRefs(data)
 const filterNode = (value, data) => {
@@ -622,31 +625,26 @@ const fileManagerPreviewFileInfo = computed(() => {
 
 const fileManagerPreviewComponent = computed(() => getPreviewComponent(fileManagerPreviewFile.value))
 
-const detailFileInfo = computed(() => {
-  if (!detailFile.value) return null
-  // 如果是CSV文件且有预览数据，直接使用预览数据
-  if (detailFile.value.name.toLowerCase().endsWith('.csv') && detailFile.value.csvData) {
-    return {
-      name: detailFile.value.name,
-      path: detailFile.value.path,
-      csvData: detailFile.value.csvData,
-      isCsv: true
-    }
-  }
-  // 其他文件类型使用原有方式
-  return {
-    name: detailFile.value.name,
-    path: detailFile.value.path,
-    contentUrl: `/api/file/content?path=${encodeURIComponent(detailFile.value.path)}`,
-    isCsv: false
-  }
-})
 
+const detailTableColumns = computed(() => Object.keys(detailTableRows.value[0] || {}))
+const isDetailTabularFile = computed(() => isTabularFile(detailFile.value))
 const detailPreviewComponent = computed(() => getPreviewComponent(detailFile.value))
+
+function getPreviewFileName(file) {
+  if (!file) return ''
+  const candidates = [file.name, file.path, file.dataName, file.dataFilePath]
+  const withSuffix = candidates.find(item => typeof item === 'string' && item.lastIndexOf('.') > -1)
+  return (withSuffix || candidates.find(item => typeof item === 'string') || '').toLowerCase()
+}
+
+function isTabularFile(file) {
+  const fileName = getPreviewFileName(file)
+  return fileName.endsWith('.csv') || fileName.endsWith('.xls') || fileName.endsWith('.xlsx')
+}
 
 function getPreviewComponent(file) {
   if (!file) return null
-  const fileName = file.name.toLowerCase()
+  const fileName = getPreviewFileName(file)
   let type = 'binary'
   
   if (fileName.endsWith('.png') || fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || 
@@ -677,6 +675,43 @@ function getPreviewComponent(file) {
     binary: BinaryViewer
   }
   return componentMap[type]
+}
+
+function resetDetailTablePreview() {
+  detailPreviewPageNum.value = 1
+  detailPreviewPageSize.value = 20
+  detailPreviewTotal.value = 0
+  detailTableRows.value = []
+}
+
+async function loadDetailTablePreview() {
+  if (!detailFile.value || !detailFile.value.path || !detailFile.value.experimentId) return
+  detailPreviewLoading.value = true
+  try {
+    const response = await previewData({
+      experimentId: detailFile.value.experimentId,
+      dataFilePath: detailFile.value.path,
+      pageNum: detailPreviewPageNum.value,
+      pageSize: detailPreviewPageSize.value
+    })
+    if (response.code === 200) {
+      const pageData = response.data || {}
+      detailTableRows.value = pageData.rows || []
+      detailPreviewTotal.value = Number(pageData.total) || 0
+      detailPreviewPageNum.value = Number(pageData.pageNum) || detailPreviewPageNum.value
+      detailPreviewPageSize.value = Number(pageData.pageSize) || detailPreviewPageSize.value
+    } else {
+      detailTableRows.value = []
+      detailPreviewTotal.value = 0
+      ElMessage.error(response.msg || "预览失败")
+    }
+  } catch (error) {
+    detailTableRows.value = []
+    detailPreviewTotal.value = 0
+    ElMessage.error("预览请求失败: " + (error.message || "未知错误"))
+  } finally {
+    detailPreviewLoading.value = false
+  }
 }
 
 
@@ -756,48 +791,27 @@ const percent=ref(0)
 const timer=ref(null)
 /** 下载详情中的文件 */
 const handleDownloadDetailFile = async (row) => {
-  const target = row || detailFile.value
-  if (!target || !target.dataFilePath) return
-  
+  if(!row.experimentId || !row.dataFilePath){
+    ElMessage.warning('缺少下载参数')
+    return
+  }
   try {
-    const res = await submitDownloadTask([target.dataFilePath])
-    const taskKey = res.data
-    pollProgress(taskKey)
+    const data = await downloadData({
+      id: row?.id,
+      experimentId: row?.experimentId,
+      dataFilePath: row?.dataFilePath
+    })
+    if (blobValidate(data)) {
+      const fileName = row.name || row.dataFilePath.substring(row.dataFilePath.lastIndexOf('/') + 1) || 'download'
+      saveAs(new Blob([data]), fileName)
+      return
+    }
+    const resText = await data.text()
+    const rspObj = JSON.parse(resText)
+    ElMessage.error(rspObj.msg || '下载失败')
   } catch (e) {
     ElMessage.error('下载失败: ' + (e.message || '未知错误'))
   }
-}
-function pollProgress(taskKey) {
-    if (timer.value) clearInterval(timer.value)
-    
-    const loadingInstance = ElLoading.service({
-        lock: true,
-        text: '正在打包下载，请稍候...',
-        background: 'rgba(0, 0, 0, 0.7)',
-    })
-
-    timer.value = setInterval(() => {
-        getDownloadTaskStatus(taskKey).then(res => {
-          if (res.code !== 200) { 
-            clearInterval(timer.value);
-            loadingInstance.close();
-            ElMessage.error(res.msg);
-            return;
-          }
-          const progress = res.data; // 后端返回的整数百分比
-          percent.value = progress;
-          // 3. 进度完成，触发真实下载
-          if (progress >= 100) {
-            clearInterval(timer.value);
-            loadingInstance.close();
-            const baseUrl = import.meta.env.VITE_APP_BASE_API
-            window.location.href = baseUrl + "/api/file/download/" + taskKey;
-          }
-        }).catch(() => {
-            clearInterval(timer.value);
-            loadingInstance.close();
-        });
-    }, 1000); // 每1秒查询一次
 }
 // --- 文件管理器逻辑结束 ---
 
@@ -835,6 +849,7 @@ function handleNodeClick(data) {
 function resetQuery() {
     proxy.resetForm("queryRef")
     dateRange.value = []
+    advancedSearchExpanded.value = false
     queryParams.value = {
         id: null,
         pageNum: 1,
@@ -921,31 +936,26 @@ function submitForm() {
 /** 详情按钮操作 (打开文件预览) */
 function handleView(row) {
   if (row.dataFilePath) {
-    // 检查是否为CSV文件
-    const fileName = row.dataName.toLowerCase()
-    if (fileName.endsWith('.csv')) {
-      // 使用后端预览API处理CSV文件
-      previewData({ experimentId: row.experimentId, dataFilePath: row.dataFilePath }).then(response => {
-        if (response.code === 200) {
-          detailFile.value = {
-            name: row.dataName,
-            path: row.dataFilePath,
-            csvData: response.data // 存储CSV预览数据
-          }
-          detailTitle.value = `CSV文件预览: ${row.dataName}`
-          detailVisible.value = true
-        } else {
-          ElMessage.error(response.msg || "预览失败")
-        }
-      }).catch(error => {
-        ElMessage.error("预览请求失败: " + error.message)
-      })
-    } else {
-      // 其他文件类型使用原有预览方式
-      detailFile.value = {
-        name: row.dataName,
-        path: row.dataFilePath
+    detailFile.value = {
+      id: row.id,
+      name: row.dataName,
+      path: row.dataFilePath,
+      dataFilePath: row.dataFilePath,
+      experimentId: row.experimentId
+    }
+
+    if (isTabularFile(row)) {
+      const fileName = getPreviewFileName(row)
+      if (fileName.endsWith('.csv')) {
+        detailTitle.value = `CSV文件预览: ${row.dataName}`
+      } else {
+        detailTitle.value = `Excel文件预览: ${row.dataName}`
       }
+      resetDetailTablePreview()
+      detailVisible.value = true
+      loadDetailTablePreview()
+    } else {
+      resetDetailTablePreview()
       detailTitle.value = `文件预览: ${row.dataName}`
       detailVisible.value = true
     }
@@ -956,6 +966,9 @@ function handleView(row) {
 
 function handleQuery(){
     getList()
+}
+function toggleAdvancedSearch() {
+    advancedSearchExpanded.value = !advancedSearchExpanded.value
 }
 function getList(){
     loading.value = true
@@ -976,6 +989,74 @@ onMounted(()=>{
 /* 禁用分割面板初始加载时的宽度过渡，使分割符打开时直接位于正确位置 */
 :deep(.splitpanes--vertical .splitpanes__pane) {
   transition: none;
+}
+
+.query-section {
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  padding: 14px 16px;
+}
+
+.query-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.query-form {
+  flex: 1;
+  min-width: 0;
+}
+
+.query-form :deep(.el-form-item) {
+  margin-bottom: 12px;
+  margin-right: 14px;
+}
+
+.query-control {
+  width: 200px;
+}
+
+.query-date-item {
+  width: 308px;
+}
+
+.query-date-control {
+  width: 100%;
+}
+
+.query-actions {
+  width: 178px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.query-action-group {
+  display: inline-flex;
+}
+
+.query-expand-btn {
+  padding: 0;
+  font-size: 15px;
+}
+
+.toolbar-divider {
+  margin: 20px 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(144, 147, 153, 0), rgba(144, 147, 153, 0.32), rgba(144, 147, 153, 0));
+}
+
+.global-actions-row {
+  margin-bottom: 12px;
+}
+
+.global-actions-row :deep(.right-toolbar) {
+  margin-left: auto;
 }
 
 /* 数据导入弹窗 - 压缩尺寸 */
@@ -1024,5 +1105,43 @@ onMounted(()=>{
 }
 .import-upload {
   margin-bottom: 0;
+}
+
+@media (max-width: 1200px) {
+  .query-actions {
+    width: 160px;
+  }
+}
+
+@media (max-width: 992px) {
+  .query-main {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .query-actions {
+    width: 100%;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+@media (max-width: 768px) {
+  .query-form :deep(.el-form-item) {
+    margin-right: 0;
+    width: 100%;
+  }
+
+  .query-control,
+  .query-date-item,
+  .query-date-control {
+    width: 100%;
+  }
+
+  .query-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>

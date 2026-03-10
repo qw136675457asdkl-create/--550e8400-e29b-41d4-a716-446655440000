@@ -314,6 +314,43 @@ public class FileUtils
         return baseName;
     }
 
+    /**
+     * 下载单个文件
+     *
+     * @param filePath 绝对路径
+     * @param downloadName 下载文件名（为空时取原文件名）
+     * @param response 响应对象
+     */
+    public static void downloadFile(String filePath, String downloadName, HttpServletResponse response)
+    {
+        if (StringUtils.isEmpty(filePath))
+        {
+            throw new ServiceException("文件路径不能为空");
+        }
+        if (StringUtils.contains(filePath, ".."))
+        {
+            throw new ServiceException("非法文件路径");
+        }
+
+        File file = new File(filePath);
+        if (!file.exists() || !file.isFile())
+        {
+            throw new ServiceException("文件不存在");
+        }
+
+        String realFileName = StringUtils.isEmpty(downloadName) ? file.getName() : downloadName;
+        try
+        {
+            response.setContentType("application/octet-stream");
+            setAttachmentResponseHeader(response, realFileName);
+            writeBytes(file.getAbsolutePath(), response.getOutputStream());
+        }
+        catch (Exception e)
+        {
+            throw new ServiceException("文件下载失败: " + e.getMessage());
+        }
+    }
+
     public static List<Map<String, Object>> previewExcel(String filePath)
     {
         File file = new File(filePath);
@@ -357,6 +394,59 @@ public class FileUtils
         }
     }
 
+    public static Map<String, Object> previewExcelByPage(String filePath, int pageNum, int pageSize)
+    {
+        File file = new File(filePath);
+        if (!file.exists())
+        {
+            throw new ServiceException("文件不存在");
+        }
+
+        int safePageNum = pageNum <= 0 ? 1 : pageNum;
+        int safePageSize = pageSize <= 0 ? 200 : pageSize;
+        int startIndex = (safePageNum - 1) * safePageSize;
+        int endIndex = startIndex + safePageSize;
+
+        String lowerName = file.getName().toLowerCase();
+        if (lowerName.endsWith(".csv"))
+        {
+            return previewCsvByPage(file, safePageNum, safePageSize, startIndex, endIndex);
+        }
+
+        try (FileInputStream fis = new FileInputStream(file); Workbook workbook = WorkbookFactory.create(fis))
+        {
+            Sheet sheet = workbook.getSheetAt(0);
+            List<Map<String, Object>> pageRows = new ArrayList<>();
+            int totalRows = 0;
+
+            for (int rowIdx = 0; rowIdx <= sheet.getLastRowNum(); rowIdx++)
+            {
+                Row row = sheet.getRow(rowIdx);
+                if (row == null)
+                {
+                    continue;
+                }
+
+                if (totalRows >= startIndex && totalRows < endIndex)
+                {
+                    Map<String, Object> rowData = new LinkedHashMap<>();
+                    for (int colIdx = 0; colIdx < row.getLastCellNum(); colIdx++)
+                    {
+                        Cell cell = row.getCell(colIdx);
+                        rowData.put("col_" + colIdx, getCellValue(cell));
+                    }
+                    pageRows.add(rowData);
+                }
+                totalRows++;
+            }
+            return buildPreviewPageResult(pageRows, totalRows, safePageNum, safePageSize);
+        }
+        catch (Exception e)
+        {
+            throw new ServiceException("Preview failed: " + e.getMessage());
+        }
+    }
+
     private static List<Map<String, Object>> previewCsv(File file)
     {
         List<Map<String, Object>> data = new ArrayList<>();
@@ -380,6 +470,51 @@ public class FileUtils
         {
             throw new ServiceException("预览失败：" + e.getMessage());
         }
+    }
+
+    private static Map<String, Object> previewCsvByPage(File file, int pageNum, int pageSize, int startIndex, int endIndex)
+    {
+        List<Map<String, Object>> pageRows = new ArrayList<>();
+        int totalRows = 0;
+
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8)))
+        {
+            String line;
+            //将第一行作为表头
+            line = reader.readLine();
+            List<String> headers = parseCsvLine(line);
+
+            while ((line = reader.readLine()) != null)
+            {
+                if (totalRows >= startIndex && totalRows < endIndex)
+                {
+                    List<String> cells = parseCsvLine(line);
+                    Map<String, Object> rowData = new LinkedHashMap<>();
+                    for (int colIdx = 0; colIdx < cells.size(); colIdx++)
+                    {
+                        rowData.put(headers.get(colIdx), cells.get(colIdx));
+                    }
+                    pageRows.add(rowData);
+                }
+                totalRows++;
+            }
+            return buildPreviewPageResult(pageRows, totalRows, pageNum, pageSize);
+        }
+        catch (Exception e)
+        {
+            throw new ServiceException("Preview failed: " + e.getMessage());
+        }
+    }
+
+    private static Map<String, Object> buildPreviewPageResult(List<Map<String, Object>> rows, int total, int pageNum, int pageSize)
+    {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("rows", rows);
+        result.put("total", total);
+        result.put("pageNum", pageNum);
+        result.put("pageSize", pageSize);
+        return result;
     }
 
     private static List<String> parseCsvLine(String line)
