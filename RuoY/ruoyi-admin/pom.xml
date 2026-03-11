@@ -92,6 +92,16 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- 达梦数据库驱动 -->
+        <dependency>
+            <groupId>com.dameng</groupId>
+            <artifactId>DmJdbcDriver8</artifactId>
+            <version>8.1.1.193</version>
+            <scope>system</scope>
+            <!-- 指向当前 pom.xml 所在目录下的 lib 文件夹 -->
+            <systemPath>${project.basedir}/lib/DmJdbcDriver8.jar</systemPath>
+        </dependency>
+
     </dependencies>
 
     <build>
@@ -102,6 +112,8 @@
                 <version>2.5.15</version>
                 <configuration>
                     <fork>true</fork> <!-- 如果没有该配置，devtools不会生效 -->
+                    <!-- 【核心配置】告诉 Maven 打包时把 scope 为 system 的依赖也打进 jar 包里 -->
+                    <includeSystemScope>true</includeSystemScope>
                 </configuration>
                 <executions>
                     <execution>
@@ -111,14 +123,14 @@
                     </execution>
                 </executions>
             </plugin>
-            <plugin>   
-                <groupId>org.apache.maven.plugins</groupId>   
-                <artifactId>maven-war-plugin</artifactId>   
-                <version>3.1.0</version>   
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-war-plugin</artifactId>
+                <version>3.1.0</version>
                 <configuration>
                     <failOnMissingWebXml>false</failOnMissingWebXml>
                     <warName>${project.artifactId}</warName>
-                </configuration>   
+                </configuration>
            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

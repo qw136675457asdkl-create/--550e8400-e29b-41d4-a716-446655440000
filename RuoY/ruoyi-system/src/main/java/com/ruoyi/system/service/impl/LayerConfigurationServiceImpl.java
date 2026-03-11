@@ -10,14 +10,18 @@
 //}
 package com.ruoyi.system.service.impl;
 
-import com.ruoyi.common.core.domain.AjaxResult;
+import com.alibaba.fastjson2.JSON;
+import com.ruoyi.system.domain.SysConfig;
 import com.ruoyi.system.domain.dto.LayerConfigurationDTO;
 import com.ruoyi.system.service.ILayerConfigurationService;
+import com.ruoyi.system.service.ISysConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * 图层配置服务实现类
@@ -28,23 +32,37 @@ import java.util.Arrays;
 public class LayerConfigurationServiceImpl implements ILayerConfigurationService {
 
     private static final Logger log = LoggerFactory.getLogger(LayerConfigurationServiceImpl.class);
+    
+    private static final String CONFIG_KEY = "sys.layer.config";
 
-    // 这里可以使用 Redis 或数据库来存储配置，示例中使用内存存储
-    private LayerConfigurationDTO currentConfig = null;
+    @Autowired
+    private ISysConfigService configService;
 
     @Override
     public int saveLayerConfiguration(LayerConfigurationDTO dto) {
         try {
             log.info("保存图层配置: {}", dto);
 
-            // TODO: 这里可以将配置保存到数据库或Redis
-            // 示例：保存到内存
-            this.currentConfig = dto;
+            String jsonConfig = JSON.toJSONString(dto);
 
-            // 实际项目中可以这样保存：
-            // 1. 保存到数据库表
-            // 2. 保存到Redis缓存
-            // 3. 保存到配置文件
+            SysConfig query = new SysConfig();
+            query.setConfigKey(CONFIG_KEY);
+            List<SysConfig> list = configService.selectConfigList(query);
+
+            if (list != null && !list.isEmpty()) {
+                // 更新现有配置
+                SysConfig existConfig = list.get(0);
+                existConfig.setConfigValue(jsonConfig);
+                configService.updateConfig(existConfig);
+            } else {
+                // 新增配置
+                SysConfig newConfig = new SysConfig();
+                newConfig.setConfigName("图层全局配置");
+                newConfig.setConfigKey(CONFIG_KEY);
+                newConfig.setConfigValue(jsonConfig);
+                newConfig.setConfigType("Y"); // Y=内置, N=自定义
+                configService.insertConfig(newConfig);
+            }
 
             log.info("图层配置保存成功");
             return 1;
@@ -57,11 +75,12 @@ public class LayerConfigurationServiceImpl implements ILayerConfigurationService
     @Override
     public LayerConfigurationDTO getLayerConfiguration() {
         try {
-            // 如果内存中没有配置，返回默认配置
-            if (currentConfig == null) {
-                return getDefaultConfiguration();
+            String jsonConfig = configService.selectConfigByKey(CONFIG_KEY);
+            if (jsonConfig != null && !jsonConfig.isEmpty()) {
+                return JSON.parseObject(jsonConfig, LayerConfigurationDTO.class);
             }
-            return currentConfig;
+            // 如果数据库中没有配置，返回默认配置
+            return getDefaultConfiguration();
         } catch (Exception e) {
             log.error("获取图层配置失败", e);
             throw new RuntimeException("获取图层配置失败: " + e.getMessage());
@@ -73,11 +92,9 @@ public class LayerConfigurationServiceImpl implements ILayerConfigurationService
         try {
             log.info("重置图层配置为默认值");
 
-            // 重置为默认配置
-            this.currentConfig = getDefaultConfiguration();
+            LayerConfigurationDTO defaultConfig = getDefaultConfiguration();
+            return saveLayerConfiguration(defaultConfig);
 
-            log.info("图层配置重置成功");
-            return 1;
         } catch (Exception e) {
             log.error("重置图层配置失败", e);
             throw new RuntimeException("重置图层配置失败: " + e.getMessage());
