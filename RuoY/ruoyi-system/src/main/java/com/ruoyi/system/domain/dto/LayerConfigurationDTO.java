@@ -1,135 +1,157 @@
 package com.ruoyi.system.domain.dto;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 图层配置 DTO（与前端 `LayerConfiguration.vue` 字段保持一致）
+ * 图层配置 DTO。
  */
 public class LayerConfigurationDTO implements Serializable
 {
     private static final long serialVersionUID = 1L;
 
-    private String field103;
-    private List<String> field105;
-    private String field106;
-    private String field107;
-    private String field108;
-    private List<String> field109;
-    private String field110;
-    private List<String> field111;
-    private List<String> field112;
-    private List<String> field113;
-    private String field114;
+    private Integer id;
 
-    public String getField103()
+    private Integer defaultOpacity;
+
+    private Boolean useTransBg;
+
+    private String bgColor;
+
+    private String textColor;
+
+    private Integer textSize;
+
+    private Integer refreshRate;
+
+    private Boolean showFloatTip;
+
+    private Boolean showErrorWind;
+
+    private Boolean enableCache;
+
+    private Integer cacheExpireTime;
+
+    private List<LayerStatusDetailDTO> layerStatuses = new ArrayList<LayerStatusDetailDTO>();
+
+    public Integer getId()
     {
-        return field103;
+        return id;
     }
 
-    public void setField103(String field103)
+    public void setId(Integer id)
     {
-        this.field103 = field103;
+        this.id = id;
     }
 
-    public List<String> getField105()
+    public Integer getDefaultOpacity()
     {
-        return field105;
+        return defaultOpacity;
     }
 
-    public void setField105(List<String> field105)
+    public void setDefaultOpacity(Integer defaultOpacity)
     {
-        this.field105 = field105;
+        this.defaultOpacity = defaultOpacity;
     }
 
-    public String getField106()
+    public Boolean getUseTransBg()
     {
-        return field106;
+        return useTransBg;
     }
 
-    public void setField106(String field106)
+    public void setUseTransBg(Boolean useTransBg)
     {
-        this.field106 = field106;
+        this.useTransBg = useTransBg;
     }
 
-    public String getField107()
+    public String getBgColor()
     {
-        return field107;
+        return bgColor;
     }
 
-    public void setField107(String field107)
+    public void setBgColor(String bgColor)
     {
-        this.field107 = field107;
+        this.bgColor = bgColor;
     }
 
-    public String getField108()
+    public String getTextColor()
     {
-        return field108;
+        return textColor;
     }
 
-    public void setField108(String field108)
+    public void setTextColor(String textColor)
     {
-        this.field108 = field108;
+        this.textColor = textColor;
     }
 
-    public List<String> getField109()
+    public Integer getTextSize()
     {
-        return field109;
+        return textSize;
     }
 
-    public void setField109(List<String> field109)
+    public void setTextSize(Integer textSize)
     {
-        this.field109 = field109;
+        this.textSize = textSize;
     }
 
-    public String getField110()
+    public Integer getRefreshRate()
     {
-        return field110;
+        return refreshRate;
     }
 
-    public void setField110(String field110)
+    public void setRefreshRate(Integer refreshRate)
     {
-        this.field110 = field110;
+        this.refreshRate = refreshRate;
     }
 
-    public List<String> getField111()
+    public Boolean getShowFloatTip()
     {
-        return field111;
+        return showFloatTip;
     }
 
-    public void setField111(List<String> field111)
+    public void setShowFloatTip(Boolean showFloatTip)
     {
-        this.field111 = field111;
+        this.showFloatTip = showFloatTip;
     }
 
-    public List<String> getField112()
+    public Boolean getShowErrorWind()
     {
-        return field112;
+        return showErrorWind;
     }
 
-    public void setField112(List<String> field112)
+    public void setShowErrorWind(Boolean showErrorWind)
     {
-        this.field112 = field112;
+        this.showErrorWind = showErrorWind;
     }
 
-    public List<String> getField113()
+    public Boolean getEnableCache()
     {
-        return field113;
+        return enableCache;
     }
 
-    public void setField113(List<String> field113)
+    public void setEnableCache(Boolean enableCache)
     {
-        this.field113 = field113;
+        this.enableCache = enableCache;
     }
 
-    public String getField114()
+    public Integer getCacheExpireTime()
     {
-        return field114;
+        return cacheExpireTime;
     }
 
-    public void setField114(String field114)
+    public void setCacheExpireTime(Integer cacheExpireTime)
     {
-        this.field114 = field114;
+        this.cacheExpireTime = cacheExpireTime;
+    }
+
+    public List<LayerStatusDetailDTO> getLayerStatuses()
+    {
+        return layerStatuses;
+    }
+
+    public void setLayerStatuses(List<LayerStatusDetailDTO> layerStatuses)
+    {
+        this.layerStatuses = layerStatuses;
     }
 }
-
