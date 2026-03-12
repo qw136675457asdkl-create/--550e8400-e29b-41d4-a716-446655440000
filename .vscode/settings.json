@@ -1,5 +1,5 @@
 {
     "java.compile.nullAnalysis.mode": "disabled",
     "chatgpt.commentCodeLensEnabled": false,
-    "java.configuration.updateBuildConfiguration": "interactive"
+    "java.configuration.updateBuildConfiguration": "automatic"
 }

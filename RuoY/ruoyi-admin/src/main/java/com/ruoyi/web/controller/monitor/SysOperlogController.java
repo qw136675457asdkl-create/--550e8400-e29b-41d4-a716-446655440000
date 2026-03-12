@@ -18,6 +18,7 @@ import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.system.domain.SysOperLog;
 import com.ruoyi.system.service.ISysOperLogService;
+import com.ruoyi.web.controller.monitor.support.LogDocumentExportUtil;
 
 /**
  * 操作日志记录
@@ -48,6 +49,24 @@ public class SysOperlogController extends BaseController
         List<SysOperLog> list = operLogService.selectOperLogList(operLog);
         ExcelUtil<SysOperLog> util = new ExcelUtil<SysOperLog>(SysOperLog.class);
         util.exportExcel(response, list, "操作日志");
+    }
+
+    @Log(title = "操作日志", businessType = BusinessType.EXPORT)
+    @PreAuthorize("@ss.hasPermi('monitor:operlog:export')")
+    @PostMapping("/export/word")
+    public void exportWord(HttpServletResponse response, SysOperLog operLog) throws Exception
+    {
+        List<SysOperLog> list = operLogService.selectOperLogList(operLog);
+        LogDocumentExportUtil.exportOperLogWord(response, list);
+    }
+
+    @Log(title = "操作日志", businessType = BusinessType.EXPORT)
+    @PreAuthorize("@ss.hasPermi('monitor:operlog:export')")
+    @PostMapping("/export/pdf")
+    public void exportPdf(HttpServletResponse response, SysOperLog operLog) throws Exception
+    {
+        List<SysOperLog> list = operLogService.selectOperLogList(operLog);
+        LogDocumentExportUtil.exportOperLogPdf(response, list);
     }
 
     @Log(title = "操作日志", businessType = BusinessType.DELETE)

@@ -19,6 +19,7 @@ import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.framework.web.service.SysPasswordService;
 import com.ruoyi.system.domain.SysLogininfor;
 import com.ruoyi.system.service.ISysLogininforService;
+import com.ruoyi.web.controller.monitor.support.LogDocumentExportUtil;
 
 /**
  * 系统访问记录
@@ -52,6 +53,24 @@ public class SysLogininforController extends BaseController
         List<SysLogininfor> list = logininforService.selectLogininforList(logininfor);
         ExcelUtil<SysLogininfor> util = new ExcelUtil<SysLogininfor>(SysLogininfor.class);
         util.exportExcel(response, list, "登录日志");
+    }
+
+    @Log(title = "登录日志", businessType = BusinessType.EXPORT)
+    @PreAuthorize("@ss.hasPermi('monitor:logininfor:export')")
+    @PostMapping("/export/word")
+    public void exportWord(HttpServletResponse response, SysLogininfor logininfor) throws Exception
+    {
+        List<SysLogininfor> list = logininforService.selectLogininforList(logininfor);
+        LogDocumentExportUtil.exportLoginInfoWord(response, list);
+    }
+
+    @Log(title = "登录日志", businessType = BusinessType.EXPORT)
+    @PreAuthorize("@ss.hasPermi('monitor:logininfor:export')")
+    @PostMapping("/export/pdf")
+    public void exportPdf(HttpServletResponse response, SysLogininfor logininfor) throws Exception
+    {
+        List<SysLogininfor> list = logininforService.selectLogininforList(logininfor);
+        LogDocumentExportUtil.exportLoginInfoPdf(response, list);
     }
 
     @PreAuthorize("@ss.hasPermi('monitor:logininfor:remove')")

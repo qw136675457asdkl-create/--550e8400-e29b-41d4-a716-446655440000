@@ -88,7 +88,25 @@
                icon="Download"
                @click="handleExport"
                v-hasPermi="['monitor:logininfor:export']"
-            >导出</el-button>
+            >导出Excel</el-button>
+         </el-col>
+         <el-col :span="1.5">
+            <el-button
+               type="primary"
+               plain
+               icon="Document"
+               @click="handleExportWord"
+               v-hasPermi="['monitor:logininfor:export']"
+            >导出Word</el-button>
+         </el-col>
+         <el-col :span="1.5">
+            <el-button
+               type="success"
+               plain
+               icon="Document"
+               @click="handleExportPdf"
+               v-hasPermi="['monitor:logininfor:export']"
+            >导出PDF</el-button>
          </el-col>
          <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
       </el-row>
@@ -227,6 +245,20 @@ function handleExport() {
   proxy.download("monitor/logininfor/export", {
     ...queryParams.value,
   }, `logininfor_${new Date().getTime()}.xlsx`)
+}
+
+/** 导出Word按钮操作 */
+function handleExportWord() {
+  proxy.download("monitor/logininfor/export/word", {
+    ...queryParams.value,
+  }, `logininfor_${new Date().getTime()}.docx`)
+}
+
+/** 导出PDF按钮操作 */
+function handleExportPdf() {
+  proxy.download("monitor/logininfor/export/pdf", {
+    ...queryParams.value,
+  }, `logininfor_${new Date().getTime()}.pdf`)
 }
 
 getList()

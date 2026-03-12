@@ -106,7 +106,27 @@
           size="mini"
           @click="handleExport"
           v-hasPermi="['monitor:operlog:export']"
-        >导出</el-button>
+        >导出Excel</el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button
+          type="primary"
+          plain
+          icon="el-icon-document"
+          size="mini"
+          @click="handleExportWord"
+          v-hasPermi="['monitor:operlog:export']"
+        >导出Word</el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button
+          type="success"
+          plain
+          icon="el-icon-document"
+          size="mini"
+          @click="handleExportPdf"
+          v-hasPermi="['monitor:operlog:export']"
+        >导出PDF</el-button>
       </el-col>
       <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
@@ -316,8 +336,19 @@ export default {
       this.download('monitor/operlog/export', {
         ...this.queryParams
       }, `operlog_${new Date().getTime()}.xlsx`)
+    },
+    /** 导出Word按钮操作 */
+    handleExportWord() {
+      this.download('monitor/operlog/export/word', {
+        ...this.queryParams
+      }, `operlog_${new Date().getTime()}.docx`)
+    },
+    /** 导出PDF按钮操作 */
+    handleExportPdf() {
+      this.download('monitor/operlog/export/pdf', {
+        ...this.queryParams
+      }, `operlog_${new Date().getTime()}.pdf`)
     }
   }
 }
 </script>
-
