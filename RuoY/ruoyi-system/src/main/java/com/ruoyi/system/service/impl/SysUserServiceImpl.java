@@ -504,7 +504,6 @@ public class SysUserServiceImpl implements ISysUserService
                     checkUserAllowed(u);
                     checkUserDataScope(u.getUserId());
                     user.setUserId(u.getUserId());
-                    user.setDeptId(u.getDeptId());
                     user.setUpdateBy(operName);
                     userMapper.updateUser(user);
                     successNum++;

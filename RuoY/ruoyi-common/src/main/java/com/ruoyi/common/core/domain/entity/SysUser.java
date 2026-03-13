@@ -27,10 +27,6 @@ public class SysUser extends BaseEntity
     @Excel(name = "用户序号", type = Type.EXPORT, cellType = ColumnType.NUMERIC, prompt = "用户编号")
     private Long userId;
 
-    /** 部门ID */
-    @Excel(name = "部门编号", type = Type.IMPORT)
-    private Long deptId;
-
     /** 用户账号 */
     @Excel(name = "登录名称")
     private String userName;
@@ -110,16 +106,6 @@ public class SysUser extends BaseEntity
     public boolean isAdmin()
     {
         return SecurityUtils.isAdmin(this.userId);
-    }
-
-    public Long getDeptId()
-    {
-        return deptId;
-    }
-
-    public void setDeptId(Long deptId)
-    {
-        this.deptId = deptId;
     }
 
     @Xss(message = "用户昵称不能包含脚本字符")
@@ -295,7 +281,6 @@ public class SysUser extends BaseEntity
     public String toString() {
         return new ToStringBuilder(this,ToStringStyle.MULTI_LINE_STYLE)
             .append("userId", getUserId())
-            .append("deptId", getDeptId())
             .append("userName", getUserName())
             .append("nickName", getNickName())
             .append("email", getEmail())

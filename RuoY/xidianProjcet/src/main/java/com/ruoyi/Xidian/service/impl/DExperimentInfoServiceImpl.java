@@ -32,7 +32,7 @@ public class DExperimentInfoServiceImpl implements IDExperimentInfoService {
     @Autowired
     private DProjectInfoMapper dProjectInfoMapper;
 
-    private final String profile = RuoYiConfig.getProfile();
+    private final String profile = RuoYiConfig.getProfile() + "/data";
 
     /**
      * 查询试验信息主树列表,并完全由后端造树

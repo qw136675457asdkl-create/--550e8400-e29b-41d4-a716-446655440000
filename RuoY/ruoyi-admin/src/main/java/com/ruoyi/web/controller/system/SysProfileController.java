@@ -1,6 +1,9 @@
 package com.ruoyi.web.controller.system;
 
+import java.nio.file.Files;
 import java.util.Map;
+
+import com.ruoyi.common.constant.Constants;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -127,7 +130,9 @@ public class SysProfileController extends BaseController
         if (!file.isEmpty())
         {
             LoginUser loginUser = getLoginUser();
-            String avatar = FileUploadUtils.upload(RuoYiConfig.getAvatarPath(), file, MimeTypeUtils.IMAGE_EXTENSION, true);
+            String fileName = FileUploadUtils.upload("/avatar", file, MimeTypeUtils.IMAGE_EXTENSION, true);
+            String relativePathWithDate = fileName.replace(Constants.RESOURCE_PREFIX, "");
+            String avatar = Constants.RESOURCE_PREFIX + "/avatar/" + relativePathWithDate.replaceAll("^/+", "");
             if (userService.updateUserAvatar(loginUser.getUserId(), avatar))
             {
                 String oldAvatar = loginUser.getUser().getAvatar();

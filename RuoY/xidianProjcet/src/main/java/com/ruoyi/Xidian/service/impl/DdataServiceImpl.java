@@ -49,7 +49,7 @@ public class DdataServiceImpl implements IDdataService
     @Autowired
     private DTargetInfoMapper dTargetInfoMapper;
 
-    private final String profile = RuoYiConfig.getProfile();
+    private final String profile = RuoYiConfig.getProfile() + "/data";
     private final String backUPdir = RuoYiConfig.getBackupDir();
 
     @Override

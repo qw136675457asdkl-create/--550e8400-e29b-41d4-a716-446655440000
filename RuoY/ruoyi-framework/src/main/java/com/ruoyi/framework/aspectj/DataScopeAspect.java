@@ -60,7 +60,7 @@ public class DataScopeAspect
             if (StringUtils.isNotNull(currentUser) && !currentUser.isAdmin())
             {
                 String permission = StringUtils.defaultIfEmpty(controllerDataScope.permission(), PermissionContextHolder.getContext());
-                dataScopeFilter(joinPoint, currentUser, controllerDataScope.deptAlias(), controllerDataScope.userAlias(), permission);
+                dataScopeFilter(joinPoint, currentUser, controllerDataScope.userAlias(), permission);
             }
         }
     }
@@ -70,11 +70,10 @@ public class DataScopeAspect
      *
      * @param joinPoint 切点
      * @param user 用户
-     * @param deptAlias 部门别名
      * @param userAlias 用户别名
      * @param permission 权限字符
      */
-    public static void dataScopeFilter(JoinPoint joinPoint, SysUser user, String deptAlias, String userAlias, String permission)
+    public static void dataScopeFilter(JoinPoint joinPoint, SysUser user, String userAlias, String permission)
     {
         StringBuilder sqlString = new StringBuilder();
         List<String> conditions = new ArrayList<String>();
@@ -100,7 +99,7 @@ public class DataScopeAspect
                     || DATA_SCOPE_DEPT.equals(dataScope)
                     || DATA_SCOPE_DEPT_AND_CHILD.equals(dataScope))
             {
-                appendDeptScopeSql(sqlString, deptAlias, userAlias, user.getDeptId());
+                appendDeptScopeSql(sqlString, userAlias);
             }
             else if (DATA_SCOPE_SELF.equals(dataScope))
             {
@@ -110,7 +109,7 @@ public class DataScopeAspect
                 }
                 else
                 {
-                    appendNoDataScopeSql(sqlString, deptAlias, userAlias);
+                    appendNoDataScopeSql(sqlString, userAlias);
                 }
             }
             conditions.add(dataScope);
@@ -118,7 +117,7 @@ public class DataScopeAspect
 
         if (StringUtils.isEmpty(conditions))
         {
-            appendNoDataScopeSql(sqlString, deptAlias, userAlias);
+            appendNoDataScopeSql(sqlString, userAlias);
         }
 
         if (StringUtils.isNotBlank(sqlString.toString()))
@@ -132,28 +131,14 @@ public class DataScopeAspect
         }
     }
 
-    private static void appendDeptScopeSql(StringBuilder sqlString, String deptAlias, String userAlias, Long deptId)
+    private static void appendDeptScopeSql(StringBuilder sqlString, String userAlias)
     {
-        if (StringUtils.isNotBlank(deptAlias) && StringUtils.isNotNull(deptId))
-        {
-            sqlString.append(StringUtils.format(" OR {}.dept_id = {} ", deptAlias, deptId));
-        }
-        else
-        {
-            appendNoDataScopeSql(sqlString, deptAlias, userAlias);
-        }
+        appendNoDataScopeSql(sqlString, userAlias);
     }
 
-    private static void appendNoDataScopeSql(StringBuilder sqlString, String deptAlias, String userAlias)
+    private static void appendNoDataScopeSql(StringBuilder sqlString, String userAlias)
     {
-        if (StringUtils.isNotBlank(deptAlias))
-        {
-            sqlString.append(StringUtils.format(" OR {}.dept_id = 0 ", deptAlias));
-        }
-        else if (StringUtils.isNotBlank(userAlias))
-        {
             sqlString.append(StringUtils.format(" OR {}.user_id = 0 ", userAlias));
-        }
     }
 
     /**

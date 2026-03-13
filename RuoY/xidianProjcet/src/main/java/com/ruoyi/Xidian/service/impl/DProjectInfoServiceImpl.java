@@ -28,7 +28,7 @@ public class DProjectInfoServiceImpl implements IDProjectInfoService
     @Autowired
     private DProjectInfoMapper dProjectInfoMapper;
 
-    private final String profile = RuoYiConfig.getProfile();
+    private final String profile = RuoYiConfig.getProfile() + "/data";
 
     /**
      * 查询项目信息

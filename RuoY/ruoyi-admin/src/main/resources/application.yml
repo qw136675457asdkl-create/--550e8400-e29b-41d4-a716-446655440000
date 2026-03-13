@@ -6,8 +6,8 @@ ruoyi:
   version: 3.9.1
   # 版权年份
   copyrightYear: 2026
-  # 文件路径 示例（ Windows配置D:/ruoyi/uploadPath，Linux配置 /home/ruoyi/uploadPath）
-  profile: /home/hyy1208/data
+  # 文件路径 示例
+  profile: /home/hyy1208
 
   # 备份目录
   backupDir: /home/hyy1208/backupdata
@@ -140,6 +140,6 @@ xss:
 # 第三方API配置
 third-api:
   amap:
-    key: "de74010723ccf9221ed20a8b75092a8b"
+    key: "123456789"
     # 高德行政区域查询接口
     district-url: "https://restapi.amap.com/v3/config/district"

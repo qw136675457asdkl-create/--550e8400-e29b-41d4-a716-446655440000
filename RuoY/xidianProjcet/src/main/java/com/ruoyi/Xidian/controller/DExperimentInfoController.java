@@ -118,7 +118,7 @@ public class DExperimentInfoController extends BaseController
      * 修改试验信息主
      */
     @PreAuthorize("@ss.hasPermi('data:info:edit')")
-    @Log(title = "试验信息主", businessType = BusinessType.UPDATE)
+    @Log(title = "试验信息", businessType = BusinessType.UPDATE)
     @PutMapping
     public AjaxResult edit(@RequestBody TreeTableVo treeTableVo)
     {
