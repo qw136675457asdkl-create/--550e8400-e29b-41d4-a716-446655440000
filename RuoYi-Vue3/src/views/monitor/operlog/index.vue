@@ -180,16 +180,14 @@
             <el-form-item label="请求方式：">{{ form.requestMethod }}</el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="操作方法：">{{ form.method }}</el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="请求参数：" style="word-break: break-all; white-space: pre-wrap;">{{
-                form.operParam
-              }}
+            <el-form-item label="操作描述：" style="word-break: break-all; white-space: pre-wrap;">
+              {{ detailDescription }}
             </el-form-item>
           </el-col>
-          <el-col :span="24">
-            <el-form-item label="返回参数：">{{ form.jsonResult }}</el-form-item>
+          <el-col :span="24" v-if="detailFacts">
+            <el-form-item label="识别信息：" style="word-break: break-all; white-space: pre-wrap;">
+              {{ detailFacts }}
+            </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="操作状态：">
@@ -234,6 +232,8 @@ const total = ref(0)
 const title = ref("")
 const dateRange = ref([])
 const defaultSort = ref({prop: "operTime", order: "descending"})
+const detailDescription = ref("")
+const detailFacts = ref("")
 
 const data = reactive({
   form: {},
@@ -292,10 +292,254 @@ function handleSortChange(column, prop, order) {
   getList()
 }
 
+function businessActionText(businessType) {
+  const actionMap = {
+    1: "新增",
+    2: "修改",
+    3: "删除",
+    4: "授权",
+    5: "导出",
+    6: "导入",
+    7: "强退",
+    8: "生成",
+    9: "清空"
+  }
+  return actionMap[businessType] || "操作"
+}
+
+function safeJsonParse(text) {
+  try {
+    return JSON.parse(text)
+  } catch (e) {
+    return null
+  }
+}
+
+function splitJsonLikeSegments(text) {
+  const segments = []
+  let start = -1
+  let depth = 0
+  let quote = false
+  let escape = false
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (quote) {
+      if (escape) {
+        escape = false
+        continue
+      }
+      if (ch === "\\") {
+        escape = true
+      } else if (ch === "\"") {
+        quote = false
+      }
+      continue
+    }
+    if (ch === "\"") {
+      quote = true
+      continue
+    }
+    if (ch === "{" || ch === "[") {
+      if (depth === 0) {
+        start = i
+      }
+      depth++
+      continue
+    }
+    if (ch === "}" || ch === "]") {
+      depth--
+      if (depth === 0 && start !== -1) {
+        segments.push(text.slice(start, i + 1))
+        start = -1
+      }
+    }
+  }
+  return segments
+}
+
+function parseOperParamValues(operParam) {
+  if (!operParam) {
+    return []
+  }
+  const raw = String(operParam).trim()
+  if (!raw) {
+    return []
+  }
+  const direct = safeJsonParse(raw)
+  if (direct !== null) {
+    return [direct]
+  }
+  const segments = splitJsonLikeSegments(raw)
+  const parsed = []
+  segments.forEach(seg => {
+    const value = safeJsonParse(seg)
+    if (value !== null) {
+      parsed.push(value)
+    }
+  })
+  return parsed
+}
+
+function pickFirst(obj, key, value) {
+  if (!obj[key] && value !== undefined && value !== null && String(value).trim() !== "") {
+    obj[key] = String(value).trim()
+  }
+}
+
+function extractFromValue(value, bag) {
+  if (value === null || value === undefined) {
+    return
+  }
+  if (Array.isArray(value)) {
+    if (value.length > 0 && value.every(item => typeof item !== "object")) {
+      if (!bag.arrayValues) {
+        bag.arrayValues = []
+      }
+      bag.arrayValues.push(value.map(item => String(item)).join(","))
+    }
+    value.forEach(item => extractFromValue(item, bag))
+    return
+  }
+  if (typeof value !== "object") {
+    return
+  }
+
+  Object.keys(value).forEach(k => {
+    const key = String(k).toLowerCase()
+    const current = value[k]
+    if (key === "type") {
+      pickFirst(bag, "type", current)
+    } else if (key === "name") {
+      pickFirst(bag, "name", current)
+    } else if (key === "projectname") {
+      pickFirst(bag, "projectName", current)
+    } else if (key === "experimentname") {
+      pickFirst(bag, "experimentName", current)
+    } else if (key === "projectid") {
+      pickFirst(bag, "projectId", current)
+    } else if (key === "experimentid") {
+      pickFirst(bag, "experimentId", current)
+    } else if (key === "projectids") {
+      pickFirst(bag, "projectIds", Array.isArray(current) ? current.join(",") : current)
+    } else if (key === "experimentids") {
+      pickFirst(bag, "experimentIds", Array.isArray(current) ? current.join(",") : current)
+    } else if (key === "id") {
+      pickFirst(bag, "id", current)
+    }
+
+    extractFromValue(current, bag)
+  })
+}
+
+function extractFromOperUrl(operUrl, bag) {
+  if (!operUrl) {
+    return
+  }
+  const url = String(operUrl)
+  const match = url.match(/\/data\/info\/([^/]+)\/project\/([^/]+)/)
+  if (match) {
+    pickFirst(bag, "experimentIds", match[1])
+    pickFirst(bag, "projectIds", match[2])
+  }
+}
+
+function buildOperDetail(row) {
+  const bag = {}
+  const parsedValues = parseOperParamValues(row.operParam)
+  parsedValues.forEach(value => extractFromValue(value, bag))
+  extractFromOperUrl(row.operUrl, bag)
+
+  // 针对 delete 接口参数是两个数组的场景（["exp1","exp2"] [1,2]）
+  if (!bag.experimentIds && !bag.projectIds && bag.arrayValues && bag.arrayValues.length > 0) {
+    if (bag.arrayValues[0]) {
+      bag.experimentIds = bag.arrayValues[0]
+    }
+    if (bag.arrayValues[1]) {
+      bag.projectIds = bag.arrayValues[1]
+    }
+  }
+
+  const actor = row.operName || "用户"
+  const action = businessActionText(row.businessType)
+  const moduleName = row.title || "当前模块"
+
+  const targets = []
+  if (bag.type === "project" && bag.name) {
+    targets.push(`项目「${bag.name}」`)
+  } else if (bag.type === "experiment" && bag.name) {
+    targets.push(`试验「${bag.name}」`)
+  }
+  if (bag.projectName) {
+    targets.push(`项目「${bag.projectName}」`)
+  }
+  if (bag.experimentName) {
+    targets.push(`试验「${bag.experimentName}」`)
+  }
+  if (!targets.length && bag.name) {
+    targets.push(`名称「${bag.name}」`)
+  }
+
+  const ids = []
+  if (bag.experimentId) {
+    ids.push(`试验ID=${bag.experimentId}`)
+  }
+  if (bag.projectId) {
+    ids.push(`项目ID=${bag.projectId}`)
+  }
+  if (bag.experimentIds) {
+    ids.push(`试验ID集合=${bag.experimentIds}`)
+  }
+  if (bag.projectIds) {
+    ids.push(`项目ID集合=${bag.projectIds}`)
+  }
+  if (!ids.length && bag.id) {
+    ids.push(`ID=${bag.id}`)
+  }
+
+  let description = `${actor}${action}了${moduleName}`
+  if (targets.length > 0) {
+    description += `，对象：${targets.join("，")}`
+  }
+  if (ids.length > 0) {
+    description += `，标识：${ids.join("，")}`
+  }
+  if (row.status === 1) {
+    description += "（执行失败）"
+  }
+
+  const facts = []
+  if (bag.type) {
+    facts.push(`类型=${bag.type}`)
+  }
+  if (bag.name) {
+    facts.push(`名称=${bag.name}`)
+  }
+  if (bag.projectName) {
+    facts.push(`项目名称=${bag.projectName}`)
+  }
+  if (bag.experimentName) {
+    facts.push(`试验名称=${bag.experimentName}`)
+  }
+  if (bag.projectIds) {
+    facts.push(`项目ID集合=${bag.projectIds}`)
+  }
+  if (bag.experimentIds) {
+    facts.push(`试验ID集合=${bag.experimentIds}`)
+  }
+
+  return {
+    description,
+    facts: facts.join("；")
+  }
+}
+
 /** 详细按钮操作 */
 function handleView(row) {
   open.value = true
   form.value = row
+  const detail = buildOperDetail(row)
+  detailDescription.value = detail.description
+  detailFacts.value = detail.facts
 }
 
 /** 删除按钮操作 */
