@@ -26,6 +26,11 @@
         <el-tooltip content="布局大小" effect="dark" placement="bottom">
           <size-select id="size-select" class="right-menu-item hover-effect" />
         </el-tooltip>
+
+        <div class="right-menu-item clock-wrapper" :title="`统一时间源：${serverZoneId || '服务器本地时区'}`">
+<!--          <span class="clock-label">统一时间</span>-->
+          <span class="clock-value">{{ serverClockText }}</span>
+        </div>
       </template>
 
       <el-dropdown @command="handleCommand" class="avatar-container right-menu-item hover-effect" trigger="hover">
@@ -64,10 +69,47 @@ import HeaderSearch from '@/components/HeaderSearch'
 import useAppStore from '@/store/modules/app'
 import useUserStore from '@/store/modules/user'
 import useSettingsStore from '@/store/modules/settings'
+import { getServerTime } from '@/api/system/time'
 
 const appStore = useAppStore()
 const userStore = useUserStore()
 const settingsStore = useSettingsStore()
+const serverClockText = ref('')
+const serverZoneId = ref('')
+const serverOffsetMs = ref(0)
+let clockTickTimer = null
+let clockSyncTimer = null
+
+function pad2(value) {
+  return String(value).padStart(2, '0')
+}
+
+function formatClock(date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`
+}
+
+function updateClockText() {
+  const correctedNow = new Date(Date.now() + serverOffsetMs.value)
+  serverClockText.value = formatClock(correctedNow)
+}
+
+async function syncServerClock() {
+  try {
+    const requestStart = Date.now()
+    const response = await getServerTime()
+    const requestEnd = Date.now()
+    const serverMillis = Number(response?.data?.epochMillis)
+    if (!Number.isNaN(serverMillis)) {
+      const roundTrip = requestEnd - requestStart
+      serverOffsetMs.value = serverMillis + Math.floor(roundTrip / 2) - requestEnd
+      serverZoneId.value = response?.data?.zoneId || ''
+    }
+  } catch (error) {
+    // 网络异常时维持当前偏移，避免时钟跳变
+  } finally {
+    updateClockText()
+  }
+}
 
 function toggleSideBar() {
   appStore.toggleSideBar()
@@ -142,6 +184,24 @@ async function toggleTheme(event) {
     settingsStore.toggleTheme()
   }
 }
+
+onMounted(() => {
+  updateClockText()
+  syncServerClock()
+  clockTickTimer = setInterval(updateClockText, 1000)
+  clockSyncTimer = setInterval(syncServerClock, 60000)
+})
+
+onBeforeUnmount(() => {
+  if (clockTickTimer) {
+    clearInterval(clockTickTimer)
+    clockTickTimer = null
+  }
+  if (clockSyncTimer) {
+    clearInterval(clockSyncTimer)
+    clockSyncTimer = null
+  }
+})
 </script>
 
 <style lang='scss' scoped>
@@ -239,6 +299,30 @@ async function toggleTheme(event) {
           &:hover {
             transform: scale(1.15);
           }
+        }
+      }
+
+      &.clock-wrapper {
+        cursor: default;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: flex-end;
+        line-height: 1.2;
+        min-width: 190px;
+        color: #303133;
+
+        .clock-label {
+          font-size: 11px;
+          color: #909399;
+          font-weight: normal;
+        }
+
+        .clock-value {
+          font-size: 14px;
+          font-weight: 600;
+          font-variant-numeric: tabular-nums;
+          letter-spacing: 0.3px;
         }
       }
     }
