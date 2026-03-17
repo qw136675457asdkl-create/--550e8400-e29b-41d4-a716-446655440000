@@ -239,7 +239,7 @@
         <el-form-item label="路径" prop="path">
           <el-input
             v-model="form.path"
-            :placeholder="isAdd ? '自动生成路径' : '请输入路径'"
+            :placeholder="isAdd ? '系统自动生成路径' : '请输入路径'"
             :disabled="isAdd"
           />
         </el-form-item>
@@ -1082,29 +1082,36 @@ getList()
 }
 
 .ant-form-dialog :deep(.el-dialog) {
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
+  border: 1px solid rgba(208, 213, 221, 0.8);
+  background: linear-gradient(180deg, #fcfdff 0%, #f8fafc 100%);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(15, 23, 42, 0.04);
 }
 
 .ant-form-dialog :deep(.el-dialog__header) {
   margin: 0;
-  padding: 22px 24px 10px;
-  border-bottom: none;
+  padding: 24px 28px 14px;
+  border-bottom: 1px solid #eaecf0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.92) 100%);
 }
 
 .ant-form-dialog :deep(.el-dialog__title) {
-  color: #1f2d3d;
-  font-size: 18px;
-  font-weight: 600;
+  color: #1f2937;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .ant-form-dialog :deep(.el-dialog__body) {
-  padding: 10px 24px 8px;
+  padding: 22px 28px 10px;
+  background: transparent;
 }
 
 .ant-form-dialog :deep(.el-dialog__footer) {
-  padding: 6px 24px 22px;
+  padding: 12px 28px 24px;
   border-top: none;
+  background: transparent;
 }
 
 .ant-form-layout :deep(.el-form-item) {
@@ -1112,58 +1119,137 @@ getList()
 }
 
 .ant-form-layout :deep(.el-form-item__label) {
-  color: #1f2d3d;
-  font-weight: 500;
+  color: #667085;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .ant-form-layout :deep(.el-input__wrapper),
 .ant-form-layout :deep(.el-textarea__inner),
 .ant-form-layout :deep(.el-select__wrapper),
 .ant-form-layout :deep(.el-date-editor.el-input__wrapper) {
-  border-radius: 8px;
-  box-shadow: 0 0 0 1px #d9d9d9 inset;
-  transition: all 0.2s ease;
+  min-height: 42px;
+  border-radius: 10px;
+  color: #111827;
+  background: #f9fafb;
+  box-shadow: 0 0 0 1px #d0d5dd inset;
+  transition: box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.ant-form-layout :deep(.el-input__inner),
+.ant-form-layout :deep(.el-textarea__inner),
+.ant-form-layout :deep(.el-select__selected-item),
+.ant-form-layout :deep(.el-date-editor .el-input__inner) {
+  color: #111827;
+}
+
+.ant-form-layout :deep(.el-input__inner::placeholder),
+.ant-form-layout :deep(.el-textarea__inner::placeholder) {
+  color: #98a2b3;
+}
+
+.ant-form-layout :deep(.el-select__placeholder),
+.ant-form-layout :deep(.el-range-input::placeholder) {
+  color: #98a2b3;
+}
+
+.ant-form-layout :deep(.el-input__prefix),
+.ant-form-layout :deep(.el-input__suffix),
+.ant-form-layout :deep(.el-select__caret),
+.ant-form-layout :deep(.el-date-editor .el-input__prefix) {
+  color: #98a2b3;
 }
 
 .ant-form-layout :deep(.el-input__wrapper.is-focus),
 .ant-form-layout :deep(.el-select__wrapper.is-focused),
 .ant-form-layout :deep(.el-date-editor.el-input__wrapper.is-focus),
 .ant-form-layout :deep(.el-textarea__inner:focus) {
-  box-shadow: 0 0 0 1px #1890ff inset, 0 0 0 3px rgba(24, 144, 255, 0.15);
+  background: #ffffff;
+  box-shadow: 0 0 0 1px #3b82f6 inset, 0 0 0 3px rgba(59, 130, 246, 0.14);
 }
 
 .ant-form-layout :deep(.el-textarea__inner) {
-  padding: 10px 12px 22px;
+  min-height: 112px;
+  padding: 12px 14px 24px;
+  background: #f9fafb;
 }
 
 .ant-form-layout :deep(.el-input__count) {
   right: 10px;
   bottom: 6px;
-  color: #8c8c8c;
+  color: #98a2b3;
   background: transparent;
 }
 
+.ant-form-layout :deep(.el-input.is-disabled .el-input__wrapper),
+.ant-form-layout :deep(.el-textarea.is-disabled .el-textarea__inner),
+.ant-form-layout :deep(.el-date-editor.is-disabled) {
+  background: #f2f4f7;
+  box-shadow: 0 0 0 1px #d0d5dd inset;
+}
+
+.ant-form-layout :deep(.el-input.is-disabled .el-input__inner),
+.ant-form-layout :deep(.el-textarea.is-disabled .el-textarea__inner),
+.ant-form-layout :deep(.el-input.is-disabled .el-input__inner::placeholder) {
+  color: #98a2b3;
+  -webkit-text-fill-color: #98a2b3;
+}
+
+.ant-form-layout :deep(.el-form-item.is-error .el-input__wrapper),
+.ant-form-layout :deep(.el-form-item.is-error .el-select__wrapper),
+.ant-form-layout :deep(.el-form-item.is-error .el-date-editor.el-input__wrapper),
+.ant-form-layout :deep(.el-form-item.is-error .el-textarea__inner) {
+  background: #fffefe;
+  box-shadow: 0 0 0 1px #f04438 inset, 0 0 0 3px rgba(240, 68, 56, 0.1);
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 6px;
+}
+
 .ant-confirm-btn {
-  min-width: 90px;
-  border-radius: 8px;
-  border-color: #1890ff;
-  background: #1890ff;
+  min-width: 116px;
+  height: 42px;
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  color: #fff;
+  background: #3b82f6;
+  box-shadow: 0 8px 18px rgba(59, 130, 246, 0.2);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .ant-confirm-btn:hover,
 .ant-confirm-btn:focus {
-  border-color: #40a9ff;
-  background: #40a9ff;
+  color: #fff;
+  background: #2563eb;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.24);
+  transform: translateY(-1px);
 }
 
 .ant-cancel-btn {
-  min-width: 88px;
-  border-radius: 8px;
+  min-width: 100px;
+  height: 42px;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  color: #475467;
+  background: #ffffff;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.ant-cancel-btn:hover,
+.ant-cancel-btn:focus {
+  color: #344054;
+  border-color: #c1c7d0;
+  background: #f9fafb;
 }
 
 .form-error-tip {
   margin-top: 4px;
-  color: #ff4d4f;
+  color: #f04438;
   font-size: 12px;
   line-height: 1.2;
 }

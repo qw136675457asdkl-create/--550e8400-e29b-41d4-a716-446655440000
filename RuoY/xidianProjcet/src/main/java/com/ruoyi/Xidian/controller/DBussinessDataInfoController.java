@@ -90,6 +90,9 @@ public class DBussinessDataInfoController extends BaseController {
     @DeleteMapping("/delete")
     @Log(title = "删除业务数据信息", businessType = BusinessType.DELETE)
     public AjaxResult deleteDdataInfos(@RequestBody List<Integer> ids){
+        if(ids==null || ids.isEmpty()){
+            throw new ServiceException("请选择需要删除的数据");
+        }
         return AjaxResult.success(ddataService.deleteDdataInfos(ids));
     }
 

@@ -83,25 +83,32 @@
                     <el-row :gutter="10" class="mb8 global-actions-row">
                         <el-col :span="1.5">
                             <el-button
-                            type="primary"
-                            plain
-                            icon="Upload"
-                            @click="openFileManager"
-                            v-hasPermi="['dataInfo:info:insert']"
-                            >导入</el-button>
+                              class="toolbar-action-btn toolbar-action-btn--import"
+                              type="primary"
+                              icon="Upload"
+                              @click="openFileManager"
+                              v-hasPermi="['dataInfo:info:insert']"
+                            >
+                              导入
+                            </el-button>
+
                         </el-col>
                         <el-col :span="1.5">
                             <el-button
-                            type="primary"
-                            plain
-                            icon="Download"
-                            @click="handleExportData"
-                            >导出</el-button>
+                              class="toolbar-action-btn toolbar-action-btn--export"
+                              type="primary"
+                              icon="Download"
+                              @click="handleExportData"
+                              v-hasPermi="['dataInfo:info:download']"
+                            >
+                              导出
+                            </el-button>
+
                         </el-col>
                         <el-col :span="1.5">
                             <el-button
+                            class="toolbar-action-btn toolbar-action-btn--delete"
                             type="danger"
-                            plain
                             icon="Delete"
                             :disabled="multiple"
                             @click="handleDelete()"
@@ -448,15 +455,6 @@
                     <el-button type="primary" @click="handleDownloadDetailFile(detailFile)" v-if="detailFile" v-hasPermi="['dataInfo:info:download']">下 载</el-button>
                     <el-button @click="detailVisible = false">关 闭</el-button>
                 </div>
-            </template>
-        </el-dialog>
-
-        <!-- 新建文件夹对话框 -->
-        <el-dialog v-model="newFolderVisible" title="新建文件夹" width="40%" append-to-body>
-            <el-input v-model="newFolderName" placeholder="输入文件夹名称" />
-            <template #footer>
-                <el-button @click="newFolderVisible = false">取消</el-button>
-                <el-button type="primary" @click="submitNewFolder">创建</el-button>
             </template>
         </el-dialog>
     </div>
@@ -1300,5 +1298,65 @@ onMounted(()=>{
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+
+.toolbar-action-btn {
+  min-width: 96px;
+  height: 40px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.14);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.toolbar-action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.18);
+  filter: brightness(1.03);
+}
+
+.toolbar-action-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.16);
+}
+
+.toolbar-action-btn:disabled {
+  transform: none;
+  box-shadow: none;
+}
+
+.toolbar-action-btn--import {
+  background: linear-gradient(135deg, #2f8f5b, #226e45);
+}
+
+.toolbar-action-btn--import:hover,
+.toolbar-action-btn--import:focus {
+  background: linear-gradient(135deg, #379f66, #287c4f);
+}
+
+.toolbar-action-btn--export {
+  background: linear-gradient(135deg, #4f7cff, #365edc);
+}
+
+.toolbar-action-btn--export:hover,
+.toolbar-action-btn--export:focus {
+  background: linear-gradient(135deg, #5e89ff, #4369e3);
+}
+
+.toolbar-action-btn--delete {
+  background: linear-gradient(135deg, #f56c6c, #dd5151);
+}
+
+.toolbar-action-btn--delete:hover,
+.toolbar-action-btn--delete:focus {
+  background: linear-gradient(135deg, #ff7f7f, #e35f5f);
 }
 </style>
