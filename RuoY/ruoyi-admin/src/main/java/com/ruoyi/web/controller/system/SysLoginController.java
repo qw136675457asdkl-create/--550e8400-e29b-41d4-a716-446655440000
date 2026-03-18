@@ -30,6 +30,7 @@ import com.ruoyi.common.core.text.Convert;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.framework.audit.AuditLogTagSupport;
 import com.ruoyi.framework.web.service.SysLoginService;
 import com.ruoyi.framework.web.service.SysPermissionService;
 import com.ruoyi.framework.web.service.TokenService;
@@ -90,6 +91,7 @@ public class SysLoginController
         {
             logininfor.setMsg("非内部IP");
             logininfor.setStatus(Constants.FAIL);
+            AuditLogTagSupport.tagLoginInfo(logininfor, null);
             logininforService.insertLogininfor(logininfor);
             SysNotice notice = new SysNotice();
             notice.setNoticeTitle("异常登录");
@@ -104,6 +106,7 @@ public class SysLoginController
         if(StringUtils.isEmpty(logininfor.getLoginLocation())||"unknown".equalsIgnoreCase(logininfor.getLoginLocation())) {
             logininfor.setLoginLocation("未知地址");
             logininfor.setStatus(Constants.FAIL);
+            AuditLogTagSupport.tagLoginInfo(logininfor, null);
             logininforService.insertLogininfor(logininfor);
             SysNotice notice = new SysNotice();
             notice.setNoticeTitle("登录地址异常");
@@ -122,6 +125,7 @@ public class SysLoginController
         logininfor.setOs(UserAgentUtils.getOperatingSystem(userAgentStr));
         logininfor.setMsg("登录成功");
         logininfor.setStatus(Constants.SUCCESS);
+        AuditLogTagSupport.tagLoginInfo(logininfor, null);
         logininforService.insertLogininfor(logininfor);
         ajax.put(Constants.TOKEN, token);
         return ajax;
