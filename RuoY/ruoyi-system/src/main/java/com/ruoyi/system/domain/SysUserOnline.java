@@ -10,9 +10,8 @@ public class SysUserOnline
     /** 会话编号 */
     private String tokenId;
 
-    /** 部门名称 */
-    private String deptName;
-
+    /** 最后活跃时间 */
+    private Long lastActiveTime;
     /** 用户名称 */
     private String userName;
 
@@ -41,15 +40,6 @@ public class SysUserOnline
         this.tokenId = tokenId;
     }
 
-    public String getDeptName()
-    {
-        return deptName;
-    }
-
-    public void setDeptName(String deptName)
-    {
-        this.deptName = deptName;
-    }
 
     public String getUserName()
     {
@@ -109,5 +99,14 @@ public class SysUserOnline
     public void setLoginTime(Long loginTime)
     {
         this.loginTime = loginTime;
+    }
+
+    public void setActiveTime(Long activeTime)
+    {
+        lastActiveTime = activeTime;
+    }
+
+    public Long getLastActiveTime() {
+        return lastActiveTime;
     }
 }

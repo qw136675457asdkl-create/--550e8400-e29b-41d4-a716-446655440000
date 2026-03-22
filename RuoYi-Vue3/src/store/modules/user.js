@@ -2,6 +2,7 @@ import router from '@/router'
 import { ElMessageBox, } from 'element-plus'
 import { login, logout, getInfo } from '@/api/login'
 import { getToken, setToken, removeToken } from '@/utils/auth'
+import { startHeartbeat, stopHeartbeat } from '@/utils/heartbeat'
 import { isHttp, isEmpty } from "@/utils/validate"
 import defAva from '@/assets/images/profile.jpg'
 
@@ -28,6 +29,7 @@ const useUserStore = defineStore(
           login(username, password, code, uuid).then(res => {
             setToken(res.token)
             this.token = res.token
+            startHeartbeat()
             resolve()
           }).catch(error => {
             reject(error)
@@ -79,6 +81,7 @@ const useUserStore = defineStore(
             this.roles = []
             this.permissions = []
             removeToken()
+            stopHeartbeat()
             resolve()
           }).catch(error => {
             reject(error)

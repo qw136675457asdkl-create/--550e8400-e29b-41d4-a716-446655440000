@@ -41,7 +41,7 @@ public class TokenService
     @Value("${token.secret}")
     private String secret;
 
-    // 令牌有效期（默认30分钟）
+    // 令牌有效期（默认60分钟）
     @Value("${token.expireTime}")
     private int expireTime;
 
@@ -101,7 +101,12 @@ public class TokenService
         if (StringUtils.isNotEmpty(token))
         {
             String userKey = getTokenKey(token);
-            redisCache.deleteObject(userKey);
+            LoginUser loginUser = redisCache.getCacheObject(userKey);
+            if (StringUtils.isNotNull(loginUser))
+            {
+                redisCache.deleteObject(userKey);
+                redisCache.deleteObject(CacheConstants.LOGIN_USER_TOKEN + loginUser.getUsername());
+            }
         }
     }
 

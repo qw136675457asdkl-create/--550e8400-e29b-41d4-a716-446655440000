@@ -5,6 +5,7 @@ import 'nprogress/nprogress.css'
 import { getToken } from '@/utils/auth'
 import { isHttp, isPathMatch } from '@/utils/validate'
 import { isRelogin } from '@/utils/request'
+import { startHeartbeat, stopHeartbeat } from '@/utils/heartbeat'
 import useUserStore from '@/store/modules/user'
 import useSettingsStore from '@/store/modules/settings'
 import usePermissionStore from '@/store/modules/permission'
@@ -20,6 +21,7 @@ const isWhiteList = (path) => {
 router.beforeEach((to, from, next) => {
   NProgress.start()
   if (getToken()) {
+    startHeartbeat()
     to.meta.title && useSettingsStore().setTitle(to.meta.title)
     /* has token*/
     if (to.path === '/login') {
@@ -53,6 +55,7 @@ router.beforeEach((to, from, next) => {
       }
     }
   } else {
+    stopHeartbeat()
     // 没有token
     if (isWhiteList(to.path)) {
       // 在免登录白名单，直接进入

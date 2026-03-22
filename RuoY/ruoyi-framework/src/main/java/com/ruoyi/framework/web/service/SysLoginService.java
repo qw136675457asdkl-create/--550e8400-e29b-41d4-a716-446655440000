@@ -2,6 +2,8 @@ package com.ruoyi.framework.web.service;
 
 import java.util.Collection;
 import javax.annotation.Resource;
+
+import org.apache.juli.OneLineFormatter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -80,6 +82,17 @@ public class SysLoginService
                     )
             );
             throw new UserPasswordNotMatchException();
+        }
+        catch (UserAlreadyLoginException e){
+            AsyncManager.me().execute(
+                    AsyncFactory.recordLogininfor(
+                            username,
+                            Constants.LOGIN_FAIL,
+                            MessageUtils.message("user.already.login"),
+                            true
+                    )
+            );
+            throw new UserAlreadyLoginException();
         }
         catch (Exception e)
         {
@@ -182,16 +195,16 @@ public class SysLoginService
             AsyncManager.me().execute(AsyncFactory.recordLogininfor(username, Constants.LOGIN_FAIL, "IP不是内部IP"));
             throw new BlackListException();
         }
-        if (isLogin(username))
+        if (isLogin(username) && isOnline(username))
         {
-            AsyncManager.me().execute(
-                    AsyncFactory.recordLogininfor(
-                            username,
-                            Constants.LOGIN_FAIL,
-                            MessageUtils.message("user.already.login"),
-                            true
-                    )
-            );
+//            AsyncManager.me().execute(
+//                    AsyncFactory.recordLogininfor(
+//                            username,
+//                            Constants.LOGIN_FAIL,
+//                            MessageUtils.message("user.already.login"),
+//                            true
+//                    )
+//            );
             throw new UserAlreadyLoginException();
         }
     }
@@ -247,5 +260,10 @@ public class SysLoginService
             }
         }
         return false;
+    }
+    private Boolean isOnline(String username)
+    {
+        String userKey = CacheConstants.LOGIN_USER_TOKEN + username;
+        return redisCache.getCacheObject(userKey) != null;
     }
 }

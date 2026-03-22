@@ -3,6 +3,11 @@ package com.ruoyi.web.controller.system;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
+import com.ruoyi.common.constant.CacheConstants;
+import com.ruoyi.common.core.redis.RedisCache;
+import com.ruoyi.system.domain.SysUserOnline;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,6 +28,8 @@ import com.ruoyi.framework.web.service.SysPermissionService;
 import com.ruoyi.framework.web.service.TokenService;
 import com.ruoyi.system.service.ISysConfigService;
 import com.ruoyi.system.service.ISysMenuService;
+
+import javax.servlet.http.HttpServletRequest;
 
 /**
  * 登录验证
@@ -46,6 +53,8 @@ public class SysLoginController
 
     @Autowired
     private ISysConfigService configService;
+    @Autowired
+    private RedisCache redisCache;
 
     /**
      * 登录方法
@@ -60,7 +69,13 @@ public class SysLoginController
                 loginBody.getCode(),
                 loginBody.getUuid()
         );
+        SysUserOnline online =new SysUserOnline();
+
+        online.setTokenId(token);
+        online.setActiveTime(System.currentTimeMillis());
+        online.setUserName(loginBody.getUsername());
         ajax.put(Constants.TOKEN, token);
+        redisCache.setCacheObject(CacheConstants.LOGIN_USER_TOKEN + loginBody.getUsername(), online, 150, TimeUnit.SECONDS);
         return ajax;
     }
 
@@ -98,6 +113,18 @@ public class SysLoginController
         List<SysMenu> menus = menuService.selectMenuTreeByUserId(userId);
         return AjaxResult.success(menuService.buildMenus(menus));
     }
+    @PostMapping("/heartbeat")
+    public AjaxResult heartbeat(HttpServletRequest request)
+    {
+        LoginUser loginUser = tokenService.getLoginUser(request);
+        if(loginUser == null){
+            return AjaxResult.error("登录过期，请重新登录");
+        }
+        heartbeat(loginUser);
+        // 验证令牌有效期，相差不足20分钟，自动刷新缓存
+        tokenService.verifyToken(loginUser);
+        return AjaxResult.success();
+    }
 
     public boolean initPasswordIsModify(Date pwdUpdateDate)
     {
@@ -118,5 +145,24 @@ public class SysLoginController
             return DateUtils.differentDaysByMillisecond(nowDate, pwdUpdateDate) > passwordValidateDays;
         }
         return false;
+    }
+
+    public void heartbeat(LoginUser loginUser)
+    {
+        if (loginUser == null || loginUser.getUsername() == null)
+        {
+            return;
+        }
+
+        String userKey = CacheConstants.LOGIN_USER_TOKEN + loginUser.getUsername();
+        SysUserOnline online = redisCache.getCacheObject(userKey);
+        if (online == null)
+        {
+            online = new SysUserOnline();
+            online.setTokenId(userKey);
+            online.setActiveTime(System.currentTimeMillis());
+            online.setUserName(loginUser.getUsername());
+        }
+        redisCache.setCacheObject(userKey, online, 150, TimeUnit.SECONDS);
     }
 }

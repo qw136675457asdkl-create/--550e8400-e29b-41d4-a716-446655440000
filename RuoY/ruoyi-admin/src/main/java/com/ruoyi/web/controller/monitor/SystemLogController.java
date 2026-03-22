@@ -23,7 +23,7 @@ public class SystemLogController extends BaseController {
     /**
      * 系统日志列表
      */
-    @PreAuthorize("hasAuthority('monitor:systemLog:list')")
+    @PreAuthorize("@ss.hasPermi('monitor:systemLog:list')")
     @GetMapping("/list")
     public TableDataInfo list() {
         List<String> list = new ArrayList<>();
@@ -36,7 +36,7 @@ public class SystemLogController extends BaseController {
         }
         return getDataTable(list);
     }
-    @PreAuthorize("hasAuthority('monitor:systemLog:preview')")
+    @PreAuthorize("@ss.hasPermi('monitor:systemLog:preview')")
     @PostMapping("/preview/{fileName}")
     public AjaxResult preview(@PathVariable String fileName) {
         Map<String, Object> previewLogs = FileUtils.previewTxt(new File("/home/hyy1208/xidianProject/logs/" + fileName));
