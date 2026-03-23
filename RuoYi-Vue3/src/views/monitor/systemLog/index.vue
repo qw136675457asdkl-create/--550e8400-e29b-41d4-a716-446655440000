@@ -8,7 +8,7 @@
       <el-table v-loading="loading" :data="fileList" border>
         <el-table-column label="序号" type="index" width="80" />
 
-        <el-table-column label="文件名">
+        <el-table-column label="文件名" min-width="260">
           <template #default="{ row }">
             <el-link type="primary" @click="handlePreview(row)">
               {{ getFileName(row) }}
@@ -16,17 +16,22 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="120">
+        <el-table-column label="操作" min-width="320">
           <template #default="{ row }">
             <el-button link type="primary" @click="handlePreview(row)" v-hasPermi="['monitor:systemLog:preview']">
               预览
             </el-button>
             <el-button link type="info" @click="handleDownload(row)" v-hasPermi="['monitor:systemLog:download']">
-              下载
+              下载原文件
+            </el-button>
+            <el-button link type="success" @click="handleExportWord(row)" v-hasPermi="['monitor:systemLog:download']">
+              导出 Word
+            </el-button>
+            <el-button link type="warning" @click="handleExportPdf(row)" v-hasPermi="['monitor:systemLog:download']">
+              导出 PDF
             </el-button>
           </template>
         </el-table-column>
-
       </el-table>
     </el-card>
 
@@ -38,9 +43,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { listSysLogs, previewLog, downloadLog } from '@/api/monitor/sysLog'
+import { saveAs } from 'file-saver'
+import { blobValidate } from '@/utils/ruoyi'
+import { listSysLogs, previewLog, downloadLog, downloadLogWord, downloadLogPdf } from '@/api/monitor/sysLog'
 
 const loading = ref(false)
 const fileList = ref([])
@@ -58,7 +65,7 @@ function getList() {
       fileList.value = res.rows || []
     })
     .catch(() => {
-      ElMessage.error('获取文件列表失败')
+      ElMessage.error('获取日志文件列表失败')
     })
     .finally(() => {
       loading.value = false
@@ -97,22 +104,41 @@ function handlePreview(row) {
       ElMessage.error('预览失败')
     })
 }
+
 function handleDownload(row) {
   const fileName = getFileName(row)
-  downloadLog(fileName)
-    .then((res) => {
-      const url = URL.createObjectURL(new Blob([res]))
-      const a = document.createElement('a')
-      a.href = url
-      a.download = fileName
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-    })
-    .catch(() => {
-      ElMessage.error('下载失败')
-    })
+  downloadBinary(downloadLog(fileName), fileName, '下载失败')
+}
+
+function handleExportWord(row) {
+  const fileName = getFileName(row)
+  downloadBinary(downloadLogWord(fileName), buildExportFileName(fileName, '.docx'), '导出 Word 失败')
+}
+
+function handleExportPdf(row) {
+  const fileName = getFileName(row)
+  downloadBinary(downloadLogPdf(fileName), buildExportFileName(fileName, '.pdf'), '导出 PDF 失败')
+}
+
+async function downloadBinary(requestPromise, downloadName, errorMessage) {
+  try {
+    const data = await requestPromise
+    if (!blobValidate(data)) {
+      const text = await data.text()
+      const result = JSON.parse(text)
+      ElMessage.error(result.msg || errorMessage)
+      return
+    }
+    saveAs(data, downloadName)
+  } catch (error) {
+    ElMessage.error(errorMessage)
+  }
+}
+
+function buildExportFileName(fileName, extension) {
+  const lastDotIndex = fileName.lastIndexOf('.')
+  const baseName = lastDotIndex > 0 ? fileName.slice(0, lastDotIndex) : fileName
+  return `${baseName}${extension}`
 }
 </script>
 

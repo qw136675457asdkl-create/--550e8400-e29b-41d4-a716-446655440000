@@ -7,8 +7,11 @@ import java.util.Date;
 import java.util.List;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
+import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFTableRow;
+import org.apache.poi.xwpf.usermodel.ParagraphAlignment;
 import com.lowagie.text.Document;
 import com.lowagie.text.DocumentException;
 import com.lowagie.text.Element;
@@ -110,6 +113,76 @@ public final class LogDocumentExportUtil
                 formatDate(item.getLoginTime()) });
     }
 
+    public static void exportSystemLogWord(HttpServletResponse response, String logFileName, List<String> lines) throws IOException
+    {
+        response.setContentType("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+        response.setCharacterEncoding("utf-8");
+        setAttachmentHeader(response, buildSystemLogExportName(logFileName, ".docx"));
+
+        try (XWPFDocument doc = new XWPFDocument())
+        {
+            XWPFParagraph titleParagraph = doc.createParagraph();
+            titleParagraph.setAlignment(ParagraphAlignment.CENTER);
+            XWPFRun titleRun = titleParagraph.createRun();
+            titleRun.setBold(true);
+            titleRun.setFontSize(14);
+            titleRun.setText("System Log - " + safe(logFileName));
+
+            XWPFTable table = doc.createTable(1, 2);
+            XWPFTableRow headerRow = table.getRow(0);
+            headerRow.getCell(0).setText("Line No.");
+            headerRow.getCell(1).setText("Content");
+
+            for (int i = 0; i < lines.size(); i++)
+            {
+                XWPFTableRow row = table.createRow();
+                row.getCell(0).setText(String.valueOf(i + 1));
+                row.getCell(1).setText(safe(lines.get(i)));
+            }
+
+            doc.write(response.getOutputStream());
+        }
+    }
+
+    public static void exportSystemLogPdf(HttpServletResponse response, String logFileName, List<String> lines) throws Exception
+    {
+        response.setContentType("application/pdf");
+        response.setCharacterEncoding("utf-8");
+        setAttachmentHeader(response, buildSystemLogExportName(logFileName, ".pdf"));
+
+        Font titleFont = buildPdfFont(14f, Font.BOLD);
+        Font headerFont = buildPdfFont(10f, Font.BOLD);
+        Font bodyFont = buildPdfFont(9f, Font.NORMAL);
+
+        Document document = new Document(PageSize.A4.rotate());
+        PdfWriter.getInstance(document, response.getOutputStream());
+        document.open();
+        try
+        {
+            Paragraph titleParagraph = new Paragraph("System Log - " + safe(logFileName), titleFont);
+            titleParagraph.setAlignment(Element.ALIGN_CENTER);
+            titleParagraph.setSpacingAfter(10f);
+            document.add(titleParagraph);
+
+            PdfPTable table = new PdfPTable(new float[] { 1.2f, 8.8f });
+            table.setWidthPercentage(100f);
+            table.addCell(buildCell("Line No.", headerFont, true));
+            table.addCell(buildCell("Content", headerFont, true, Element.ALIGN_LEFT));
+
+            for (int i = 0; i < lines.size(); i++)
+            {
+                table.addCell(buildCell(String.valueOf(i + 1), bodyFont, false));
+                table.addCell(buildCell(lines.get(i), bodyFont, false, Element.ALIGN_LEFT));
+            }
+
+            document.add(table);
+        }
+        finally
+        {
+            document.close();
+        }
+    }
+
     private static <T> void writeWord(HttpServletResponse response, String filePrefix, String[] headers, List<T> data,
             RowMapper<T> rowMapper) throws IOException
     {
@@ -188,8 +261,13 @@ public final class LogDocumentExportUtil
 
     private static PdfPCell buildCell(String text, Font font, boolean header)
     {
+        return buildCell(text, font, header, Element.ALIGN_CENTER);
+    }
+
+    private static PdfPCell buildCell(String text, Font font, boolean header, int horizontalAlignment)
+    {
         PdfPCell cell = new PdfPCell(new Paragraph(safe(text), font));
-        cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        cell.setHorizontalAlignment(horizontalAlignment);
         cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
         cell.setPadding(4f);
         if (header)
@@ -278,6 +356,15 @@ public final class LogDocumentExportUtil
     private static String safe(String value)
     {
         return value == null ? "" : value;
+    }
+
+    private static String buildSystemLogExportName(String logFileName, String extension)
+    {
+        String name = safe(logFileName);
+        int dotIndex = name.lastIndexOf('.');
+        String baseName = dotIndex > 0 ? name.substring(0, dotIndex) : name;
+        String prefix = baseName.isEmpty() ? "systemlog" : baseName;
+        return prefix + "_" + DateUtils.dateTimeNow(DateUtils.YYYYMMDDHHMMSS) + extension;
     }
 
     private static void setAttachmentHeader(HttpServletResponse response, String fileName) throws IOException
