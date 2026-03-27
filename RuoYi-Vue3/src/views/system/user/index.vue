@@ -226,6 +226,52 @@ const columns = ref({
   createTime: { label: '创建时间', visible: true }
 })
 
+function getPasswordProfile(password = "") {
+  const hasLetter = /[A-Za-z]/.test(password)
+  const hasNumber = /\d/.test(password)
+  const hasSpecial = /[^A-Za-z0-9<>"'|\\\s]/.test(password)
+
+  return {
+    hasLetter,
+    hasNumber,
+    hasSpecial
+  }
+}
+
+const validatePasswordComplexity = (rule, value, callback) => {
+  if (!value || value.length < 5 || value.length > 20) {
+    callback()
+    return
+  }
+
+  const { hasLetter, hasNumber, hasSpecial } = getPasswordProfile(value)
+
+  if (!hasLetter || !hasNumber || !hasSpecial) {
+    callback(new Error("密码必须同时包含字母、数字和特殊字符"))
+    return
+  }
+
+  callback()
+}
+
+function getPromptPasswordError(value) {
+  if (!value || value.length < 5 || value.length > 20) {
+    return "用户密码长度必须介于 5 和 20 之间"
+  }
+
+  if (/<|>|"|'|\||\\/.test(value)) {
+    return "不能包含非法字符：< > \" ' \\ |"
+  }
+
+  const { hasLetter, hasNumber, hasSpecial } = getPasswordProfile(value)
+
+  if (!hasLetter || !hasNumber || !hasSpecial) {
+    return "密码必须同时包含字母、数字和特殊字符"
+  }
+
+  return true
+}
+
 const data = reactive({
   form: {},
   queryParams: {
@@ -238,7 +284,12 @@ const data = reactive({
   rules: {
     userName: [{ required: true, message: "工号不能为空", trigger: "blur" }, { min: 2, max: 20, message: "工号长度必须介于 2 和 20 之间", trigger: "blur" }],
     nickName: [{ required: true, message: "用户名称不能为空", trigger: "blur" }],
-    password: [{ required: true, message: "用户密码不能为空", trigger: "blur" }, { min: 5, max: 20, message: "用户密码长度必须介于 5 和 20 之间", trigger: "blur" }, { pattern: /^[^<>"'|\\]+$/, message: "不能包含非法字符：< > \" ' \\\ |", trigger: "blur" }],
+    password: [
+      { required: true, message: "用户密码不能为空", trigger: "blur" },
+      { min: 5, max: 20, message: "用户密码长度必须介于 5 和 20 之间", trigger: "blur" },
+      { pattern: /^[^<>"'|\\]+$/, message: "不能包含非法字符：< > \" ' \\\ |", trigger: "blur" },
+      { validator: validatePasswordComplexity, trigger: "blur" }
+    ],
     email: [{ type: "email", message: "请输入正确的邮箱地址", trigger: ["blur", "change"] }],
     phonenumber: [{ pattern: /^1[3|4|5|6|7|8|9][0-9]\d{8}$/, message: "请输入正确的手机号码", trigger: "blur" }]
   }
@@ -321,9 +372,7 @@ function handleResetPwd(row) {
     inputPattern: /^.{5,20}$/,
     inputErrorMessage: "用户密码长度必须介于 5 和 20 之间",
     inputValidator: (value) => {
-      if (/<|>|"|'|\||\\/.test(value)) {
-        return "不能包含非法字符：< > \" ' \\\ |"
-      }
+      return getPromptPasswordError(value)
     },
   }).then(({ value }) => {
     resetUserPwd(row.userId, value).then(response => {

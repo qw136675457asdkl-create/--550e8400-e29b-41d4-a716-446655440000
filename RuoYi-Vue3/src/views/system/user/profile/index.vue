@@ -31,12 +31,6 @@
               <span class="profile-value">{{ state.user.email || "--" }}</span>
             </div>
             <div class="profile-row">
-              <span class="profile-label"><svg-icon icon-class="tree" /> 所属部门</span>
-              <span class="profile-value">
-                {{ state.user.dept ? `${state.user.dept.deptName || "--"} / ${state.postGroup || "--"}` : "--" }}
-              </span>
-            </div>
-            <div class="profile-row">
               <span class="profile-label"><svg-icon icon-class="peoples" /> 所属角色</span>
               <span class="profile-value">{{ state.roleGroup || "--" }}</span>
             </div>

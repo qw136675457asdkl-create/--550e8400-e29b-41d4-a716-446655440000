@@ -33,7 +33,7 @@
           </el-input>
         </el-form-item>
 
-        <el-form-item prop="password" class="custom-form-item">
+        <el-form-item prop="password" class="custom-form-item password-form-item">
           <el-input
             v-model="registerForm.password"
             type="password"
@@ -44,6 +44,15 @@
             @keyup.enter="handleRegister"
           >
             <template #prefix><svg-icon icon-class="password" class="el-input__icon input-icon" /></template>
+            <template #suffix>
+              <span
+                v-if="passwordStrength"
+                class="password-strength"
+                :class="passwordStrength.className"
+              >
+                {{ passwordStrength.label }}
+              </span>
+            </template>
           </el-input>
         </el-form-item>
 
@@ -109,7 +118,7 @@ import defaultSettings from "@/settings"
 const title = import.meta.env.VITE_APP_TITLE
 const footerContent = defaultSettings.footerContent
 const router = useRouter()
-const { proxy } = getCurrentInstance()
+const registerRef = ref()
 
 const registerForm = ref({
   username: "",
@@ -119,6 +128,65 @@ const registerForm = ref({
   code: "",
   uuid: ""
 })
+
+const passwordStrengthLevels = {
+  weak: { label: "弱", className: "is-weak" },
+  medium: { label: "中", className: "is-medium" },
+  strong: { label: "强", className: "is-strong" }
+}
+
+function getPasswordProfile(password = "") {
+  const hasLetter = /[A-Za-z]/.test(password)
+  const hasNumber = /\d/.test(password)
+  const hasSpecial = /[^A-Za-z0-9<>"'|\\\s]/.test(password)
+  const hasMixedCase = /[a-z]/.test(password) && /[A-Z]/.test(password)
+
+  return {
+    hasLetter,
+    hasNumber,
+    hasSpecial,
+    hasMixedCase,
+    typeCount: [hasLetter, hasNumber, hasSpecial].filter(Boolean).length
+  }
+}
+
+const passwordStrength = computed(() => {
+  const password = registerForm.value.password
+
+  if (!password || password.length < 5) {
+    return null
+  }
+
+  const { typeCount, hasMixedCase } = getPasswordProfile(password)
+
+  if (typeCount <= 1 || password.length < 8) {
+    return passwordStrengthLevels.weak
+  }
+
+  if (typeCount === 2 || password.length < 10) {
+    return passwordStrengthLevels.medium
+  }
+
+  return hasMixedCase || password.length >= 12
+    ? passwordStrengthLevels.strong
+    : passwordStrengthLevels.medium
+})
+
+const validatePasswordComplexity = (rule, value, callback) => {
+  if (!value || value.length < 5 || value.length > 20) {
+    callback()
+    return
+  }
+
+  const { hasLetter, hasNumber, hasSpecial } = getPasswordProfile(value)
+
+  if (!hasLetter || !hasNumber || !hasSpecial) {
+    callback(new Error("密码必须同时包含字母、数字和特殊字符"))
+    return
+  }
+
+  callback()
+}
 
 const equalToPassword = (rule, value, callback) => {
   if (registerForm.value.password !== value) {
@@ -140,7 +208,8 @@ const registerRules = {
   password: [
     { required: true, trigger: "blur", message: "请输入您的密码" },
     { min: 5, max: 20, message: "用户密码长度必须介于 5 和 20 之间", trigger: "blur" },
-    { pattern: /^[^<>"'|\\]+$/, message: "不能包含非法字符：< > \" ' \\ |", trigger: "blur" }
+    { pattern: /^[^<>"'|\\]+$/, message: "不能包含非法字符：< > \" ' \\ |", trigger: "blur" },
+    { validator: validatePasswordComplexity, trigger: "blur" }
   ],
   confirmPassword: [
     { required: true, trigger: "blur", message: "请再次输入您的密码" },
@@ -153,8 +222,14 @@ const codeUrl = ref("")
 const loading = ref(false)
 const captchaEnabled = ref(true)
 
+watch(() => registerForm.value.password, () => {
+  if (registerForm.value.confirmPassword) {
+    registerRef.value?.validateField("confirmPassword")
+  }
+})
+
 function handleRegister() {
-  proxy.$refs.registerRef.validate(valid => {
+  registerRef.value?.validate(valid => {
     if (valid) {
       loading.value = true
       register(registerForm.value).then(res => {
@@ -324,6 +399,39 @@ getCode()
   width: 1.2em;
   height: 1.2em;
   color: #fff;
+}
+
+:deep(.password-form-item .el-input__suffix-inner) {
+  display: flex;
+  align-items: center;
+}
+
+.password-strength {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.password-strength.is-weak {
+  color: #ffb4b4;
+  background: rgba(255, 107, 107, 0.18);
+}
+
+.password-strength.is-medium {
+  color: #ffd27d;
+  background: rgba(255, 184, 77, 0.18);
+}
+
+.password-strength.is-strong {
+  color: #8ff0c0;
+  background: rgba(43, 199, 118, 0.2);
 }
 
 :deep(.captcha-form-item .el-form-item__content) {
