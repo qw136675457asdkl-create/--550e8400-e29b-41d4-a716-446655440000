@@ -1,6 +1,6 @@
 // base color
-$blue: #324157;
-$light-blue: #333c46;
+$blue: #405EFE;
+$light-blue: #6F85FF;
 $red: #C03639;
 $pink: #E65D6E;
 $green: #30B08F;
@@ -9,30 +9,30 @@ $yellow: #FEC171;
 $panGreen: #30B08F;
 
 // 默认主题变量
-$menuText: #bfcbd9;
-$menuActiveText: #409eff;
-$menuBg: #304156;
-$menuHover: #263445;
+$menuText: #CBD5E1;
+$menuActiveText: #405EFE;
+$menuBg: #111827;
+$menuHover: #1F2937;
 
 // 浅色主题theme-light
 $menuLightBg: #ffffff;
-$menuLightHover: #f0f1f5;
-$menuLightText: #303133;
-$menuLightActiveText: #409EFF;
+$menuLightHover: #F8FAFC;
+$menuLightText: #0F172A;
+$menuLightActiveText: #405EFE;
 
 // 基础变量
 $base-sidebar-width: 200px;
 $sideBarWidth: 200px;
 
 // 菜单暗色变量
-$base-menu-color: #bfcbd9;
-$base-menu-color-active: #f4f4f5;
-$base-menu-background: #304156;
-$base-sub-menu-background: #1f2d3d;
-$base-sub-menu-hover: #001528;
+$base-menu-color: #CBD5E1;
+$base-menu-color-active: #FFFFFF;
+$base-menu-background: #111827;
+$base-sub-menu-background: #0F172A;
+$base-sub-menu-hover: #1E293B;
 
 // 组件变量
-$--color-primary: #409EFF;
+$--color-primary: #405EFE;
 $--color-success: #67C23A;
 $--color-warning: #E6A23C;
 $--color-danger: #F56C6C;
@@ -71,9 +71,15 @@ $--color-info: #909399;
   --sidebar-bg: #{$menuBg};
   --sidebar-text: #{$menuText};
   --menu-hover: #{$menuHover};
+  --menu-active-text: #{$menuActiveText};
+  --menu-active-bg: rgba(64, 94, 254, 0.1);
   
   --navbar-bg: #ffffff;
-  --navbar-text: #303133;
+  --navbar-text: #0F172A;
+  --navbar-surface: rgba(255, 255, 255, 0.92);
+  --navbar-border: rgba(226, 232, 240, 0.88);
+  --navbar-hover-soft: rgba(148, 163, 184, 0.14);
+  --app-main-bg: #F1F5F9;
   
   /* splitpanes default-theme 变量 */
   --splitpanes-default-bg: #ffffff;
@@ -91,18 +97,23 @@ html.dark {
   --el-border-color-light: #434343;
   
   /* primary */
-  --primary-bg: #18212b;
+  --primary-bg: rgba(64, 94, 254, 0.14);
 
   /* 侧边栏 */
-  --sidebar-bg: #141414;
-  --sidebar-text: #ffffff;
-  --menu-hover: #2d2d2d;
+  --sidebar-bg: #0F172A;
+  --sidebar-text: #E5E7EB;
+  --menu-hover: #1F2937;
   --menu-active-text: #{$menuActiveText};
+  --menu-active-bg: rgba(64, 94, 254, 0.18);
 
   /* 顶部导航栏 */
-  --navbar-bg: #141414;
-  --navbar-text: #ffffff;
-  --navbar-hover: #141414;
+  --navbar-bg: #0F172A;
+  --navbar-text: #E5E7EB;
+  --navbar-hover: #111827;
+  --navbar-surface: rgba(15, 23, 42, 0.9);
+  --navbar-border: rgba(51, 65, 85, 0.85);
+  --navbar-hover-soft: rgba(148, 163, 184, 0.14);
+  --app-main-bg: #0B1220;
 
   /* 标签栏 */
   --tags-bg: #141414;

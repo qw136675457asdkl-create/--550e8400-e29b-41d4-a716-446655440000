@@ -1,42 +1,34 @@
-﻿<template>
+<template>
   <div class="navbar" :class="'nav' + settingsStore.navType">
-    <hamburger id="hamburger-container" :is-active="appStore.sidebar.opened" class="hamburger-container" @toggleClick="toggleSideBar" />
-    <breadcrumb v-if="settingsStore.navType == 1" id="breadcrumb-container" class="breadcrumb-container" />
-    <top-nav v-if="settingsStore.navType == 2" id="topmenu-container" class="topmenu-container" />
-    <template v-if="settingsStore.navType == 3">
-      <logo v-show="settingsStore.sidebarLogo" :collapse="false"></logo>
-      <top-bar id="topbar-container" class="topbar-container" />
-    </template>
+    <div class="navbar-main">
+      <hamburger id="hamburger-container" :is-active="appStore.sidebar.opened" class="hamburger-container" @toggleClick="toggleSideBar" />
+      <breadcrumb v-if="settingsStore.navType == 1" id="breadcrumb-container" class="breadcrumb-container" />
+      <top-nav v-if="settingsStore.navType == 2" id="topmenu-container" class="topmenu-container" />
+      <template v-if="settingsStore.navType == 3">
+        <logo v-show="settingsStore.sidebarLogo" :collapse="false" class="navbar-logo" />
+        <top-bar id="topbar-container" class="topbar-container" />
+      </template>
+    </div>
 
     <div class="right-menu">
-      <template v-if="appStore.device !== 'mobile'">
-        <header-search id="header-search" class="right-menu-item" />
-
-
+      <div v-if="appStore.device !== 'mobile'" class="right-menu-actions">
+        <header-search id="header-search" class="right-menu-item hover-effect" />
 
         <screenfull id="screenfull" class="right-menu-item hover-effect" />
-
-        <el-tooltip content="主题模式" effect="dark" placement="bottom">
-          <div class="right-menu-item hover-effect theme-switch-wrapper" @click="toggleTheme">
-            <svg-icon v-if="settingsStore.isDark" icon-class="sunny" />
-            <svg-icon v-if="!settingsStore.isDark" icon-class="moon" />
-          </div>
-        </el-tooltip>
 
         <el-tooltip content="布局大小" effect="dark" placement="bottom">
           <size-select id="size-select" class="right-menu-item hover-effect" />
         </el-tooltip>
 
         <div class="right-menu-item clock-wrapper" :title="'统一时间源：' + (serverZoneId || '服务器本地时区')">
-<!--          <span class="clock-label">统一时间</span>-->
           <span class="clock-value">{{ serverClockText }}</span>
         </div>
-      </template>
+      </div>
 
-      <el-dropdown @command="handleCommand" class="avatar-container right-menu-item hover-effect" trigger="hover">
+      <el-dropdown @command="handleCommand" class="avatar-container right-menu-item" trigger="hover">
         <div class="avatar-wrapper">
           <img :src="userStore.avatar" class="user-avatar" />
-          <span class="user-nickname"> {{ userStore.nickName }} </span>
+          <span class="user-nickname">{{ userStore.nickName }}</span>
         </div>
         <template #dropdown>
           <el-dropdown-menu>
@@ -44,8 +36,8 @@
               <el-dropdown-item>个人中心</el-dropdown-item>
             </router-link>
             <el-dropdown-item command="setLayout" v-if="settingsStore.showSettings">
-                <span>布局设置</span>
-              </el-dropdown-item>
+              <span>布局设置</span>
+            </el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>
@@ -150,46 +142,6 @@ function setLayout() {
   emits('setLayout')
 }
 
-async function toggleTheme(event) {
-  const x = event?.clientX || window.innerWidth / 2
-  const y = event?.clientY || window.innerHeight / 2
-  const wasDark = settingsStore.isDark
-
-  const isReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  const isSupported = document.startViewTransition && !isReducedMotion
-
-  if (!isSupported) {
-    settingsStore.toggleTheme()
-    return
-  }
-
-  try {
-    const transition = document.startViewTransition(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 10))
-      settingsStore.toggleTheme()
-      await nextTick()
-    })
-    await transition.ready
-
-    const endRadius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y))
-    const clipPath = [`circle(0px at ${x}px ${y}px)`, `circle(${endRadius}px at ${x}px ${y}px)`]
-    document.documentElement.animate(
-      {
-        clipPath: !wasDark ? [...clipPath].reverse() : clipPath
-      }, {
-        duration: 650,
-        easing: "cubic-bezier(0.4, 0, 0.2, 1)",
-        fill: "forwards",
-        pseudoElement: !wasDark ? "::view-transition-old(root)" : "::view-transition-new(root)"
-      }
-    )
-    await transition.finished
-  } catch (error) {
-    console.warn("View transition failed, falling back to immediate toggle:", error)
-    settingsStore.toggleTheme()
-  }
-}
-
 onMounted(() => {
   updateClockText()
   syncServerClock()
@@ -217,39 +169,60 @@ onBeforeUnmount(() => {
 }
 
 .navbar {
-  height: 50px;
-  overflow: hidden;
+  height: 60px;
   position: relative;
-  background: var(--navbar-bg);
-  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  background: var(--navbar-surface, var(--navbar-bg));
+  border-bottom: 1px solid var(--navbar-border, rgba(226, 232, 240, 0.88));
+  backdrop-filter: blur(18px);
   display: flex;
   align-items: center;
-  // padding: 0 8px;
+  padding: 0 18px 0 14px;
   box-sizing: border-box;
 
+  .navbar-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    overflow: hidden;
+  }
+
   .hamburger-container {
-    line-height: 46px;
-    height: 100%;
-    cursor: pointer;
-    transition: background 0.3s;
+    width: 40px;
+    height: 40px;
+    margin-right: 2px;
+    border-radius: 50%;
     -webkit-tap-highlight-color: transparent;
     display: flex;
     align-items: center;
+    justify-content: center;
     flex-shrink: 0;
-    margin-right: 8px;
+    color: var(--navbar-text);
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.2s ease;
 
     &:hover {
-      background: rgba(0, 0, 0, 0.025);
+      background: var(--navbar-hover-soft, rgba(148, 163, 184, 0.14));
+      transform: translateY(-1px);
     }
   }
 
   .breadcrumb-container {
+    height: 100%;
+    display: flex;
+    align-items: center;
     flex-shrink: 0;
   }
 
   .topmenu-container {
-    position: absolute;
-    left: 50px;
+    flex: 1;
+    min-width: 0;
+    position: static;
+  }
+
+  .navbar-logo {
+    flex-shrink: 0;
   }
 
   .topbar-container {
@@ -258,7 +231,6 @@ onBeforeUnmount(() => {
     display: flex;
     align-items: center;
     overflow: hidden;
-    margin-left: 8px;
   }
 
   .errLog-container {
@@ -267,102 +239,98 @@ onBeforeUnmount(() => {
   }
 
   .right-menu {
-    height: 100%;
-    line-height: 50px;
     display: flex;
     align-items: center;
+    gap: 8px;
     margin-left: auto;
+    flex-shrink: 0;
+    height: 100%;
 
     &:focus {
       outline: none;
     }
 
+    .right-menu-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
     .right-menu-item {
-      display: inline-block;
-      padding: 0 8px;
-      height: 100%;
-      font-size: 18px;
-      color: #5a5e66;
-      vertical-align: text-bottom;
+      min-height: 40px;
+      color: var(--navbar-text);
+      font-size: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
 
       &.hover-effect {
+        width: 40px;
+        min-width: 40px;
+        height: 40px;
+        padding: 0;
+        border-radius: 50%;
         cursor: pointer;
-        transition: background 0.3s;
+        transition: background-color 0.2s ease, transform 0.2s ease, color 0.2s ease;
 
         &:hover {
-          background: rgba(0, 0, 0, 0.025);
-        }
-      }
-
-      &.theme-switch-wrapper {
-        display: flex;
-        align-items: center;
-
-        svg {
-          transition: transform 0.3s;
-
-          &:hover {
-            transform: scale(1.15);
-          }
+          background: var(--navbar-hover-soft, rgba(148, 163, 184, 0.14));
+          transform: translateY(-1px);
         }
       }
 
       &.clock-wrapper {
         cursor: default;
+        min-height: 40px;
+        padding: 0 12px;
+        border-radius: 999px;
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: flex-end;
-        line-height: 1.2;
-        min-width: 190px;
-        color: #303133;
-
-        .clock-label {
-          font-size: 11px;
-          color: #909399;
-          font-weight: normal;
-        }
+        line-height: 1.1;
+        min-width: 184px;
+        background: rgba(148, 163, 184, 0.1);
+        color: var(--navbar-text);
 
         .clock-value {
           font-size: 14px;
           font-weight: 600;
           font-variant-numeric: tabular-nums;
-          letter-spacing: 0.3px;
+          letter-spacing: 0.2px;
         }
       }
     }
 
     .avatar-container {
-      margin-right: 0px;
-      padding-right: 0px;
+      padding: 0;
+      min-height: 40px;
 
       .avatar-wrapper {
-        margin-top: 10px;
-        right: 8px;
-        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 10px 6px 6px;
+        border-radius: 999px;
+        transition: background-color 0.2s ease, transform 0.2s ease;
+
+        &:hover {
+          background: var(--navbar-hover-soft, rgba(148, 163, 184, 0.14));
+          transform: translateY(-1px);
+        }
 
         .user-avatar {
           cursor: pointer;
-          width: 30px;
-          height: 30px;
-          margin-right: 8px;
+          width: 32px;
+          height: 32px;
           border-radius: 50%;
+          object-fit: cover;
         }
 
-        .user-nickname{
-          position: relative;
-          left: 0px;
-          bottom: 10px;
+        .user-nickname {
           font-size: 14px;
-          font-weight: bold;
-        }
-
-        i {
-          cursor: pointer;
-          position: absolute;
-          right: -20px;
-          top: 25px;
-          font-size: 12px;
+          font-weight: 600;
+          color: var(--navbar-text);
         }
       }
     }
@@ -372,74 +340,155 @@ onBeforeUnmount(() => {
 .logout-btn-wrapper {
   display: flex;
   align-items: center;
-  height: 100%;
-  margin-left: 8px;
-  margin-right: 8px;
+  margin-left: 2px;
 }
 
 .Btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: flex-start;
-  width: 45px;
-  height: 45px;
+  justify-content: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 14px;
   border: none;
-  border-radius: 50%;
+  border-radius: 999px;
   cursor: pointer;
   position: relative;
-  overflow: hidden;
-  transition-duration: .3s;
-  box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.199);
-  background-color: rgb(255, 65, 65);
+  overflow: visible;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+  box-shadow: none;
+  background-color: rgba(239, 68, 68, 0.12);
 }
 
 .sign {
-  width: 100%;
-  transition-duration: .3s;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .sign svg {
-  width: 17px;
+  width: 15px;
 }
 
 .sign svg path {
-  fill: white;
+  fill: #dc2626;
 }
 
 .text {
-  position: absolute;
-  right: 0%;
-  width: 0%;
-  opacity: 0;
-  color: white;
-  font-size: 1.2em;
+  position: static;
+  width: auto;
+  opacity: 1;
+  color: #dc2626;
+  font-size: 13px;
   font-weight: 600;
-  transition-duration: .3s;
+  margin-left: 8px;
 }
 
 .Btn:hover {
-  width: 125px;
-  border-radius: 40px;
-  transition-duration: .3s;
+  background-color: rgba(239, 68, 68, 0.18);
+  transform: translateY(-1px);
 }
 
 .Btn:hover .sign {
-  width: 30%;
-  transition-duration: .3s;
-  padding-left: 20px;
+  padding-left: 0;
 }
 
 .Btn:hover .text {
-  opacity: 1;
-  width: 70%;
-  transition-duration: .3s;
-  padding-right: 10px;
+  width: auto;
+  padding-right: 0;
 }
 
 .Btn:active {
-  transform: translate(2px ,2px);
+  transform: translateY(0);
+}
+
+:deep(.app-breadcrumb.el-breadcrumb) {
+  line-height: 1.2;
+}
+
+:deep(.app-breadcrumb .el-breadcrumb__inner),
+:deep(.app-breadcrumb .el-breadcrumb__inner a) {
+  color: var(--navbar-text);
+}
+
+:deep(.topmenu-container.el-menu--horizontal),
+:deep(.topbar-container.topbar-menu.el-menu--horizontal) {
+  border-bottom: none !important;
+  background: transparent !important;
+}
+
+:deep(.topmenu-container.el-menu--horizontal > .el-menu-item),
+:deep(.topmenu-container.el-menu--horizontal > .el-sub-menu .el-sub-menu__title),
+:deep(.topbar-container.topbar-menu.el-menu--horizontal > .el-menu-item),
+:deep(.topbar-container.topbar-menu.el-menu--horizontal > .el-sub-menu .el-sub-menu__title) {
+  height: 60px !important;
+  line-height: 60px !important;
+  color: var(--navbar-text) !important;
+  margin: 0 8px !important;
+  border-bottom: none !important;
+  background: transparent !important;
+}
+
+:deep(.topmenu-container.el-menu--horizontal > .el-menu-item.is-active),
+:deep(.topmenu-container.el-menu--horizontal > .el-sub-menu.is-active .el-sub-menu__title),
+:deep(.topbar-container.topbar-menu.el-menu--horizontal > .el-menu-item.is-active),
+:deep(.topbar-container.topbar-menu.el-menu--horizontal > .el-sub-menu.is-active .el-sub-menu__title) {
+  color: var(--menu-active-text, #405efe) !important;
+  box-shadow: inset 0 -2px 0 var(--menu-active-text, #405efe);
+}
+
+:deep(.topmenu-container.el-menu--horizontal > .el-menu-item:not(.is-disabled):hover),
+:deep(.topmenu-container.el-menu--horizontal > .el-sub-menu .el-sub-menu__title:hover),
+:deep(.topbar-container.topbar-menu.el-menu--horizontal > .el-menu-item:not(.is-disabled):hover),
+:deep(.topbar-container.topbar-menu.el-menu--horizontal > .el-sub-menu .el-sub-menu__title:hover) {
+  background: transparent !important;
+}
+
+:deep(.right-menu-item .header-search),
+:deep(.right-menu-item > div),
+:deep(.right-menu-item .el-dropdown) {
+  width: 100%;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:deep(.header-search .search-icon),
+:deep(.right-menu-item .svg-icon) {
+  font-size: 18px;
+}
+
+:deep(.size-icon--style) {
+  font-size: 18px;
+  line-height: 1;
+  padding-right: 0;
+}
+
+@media screen and (max-width: 1360px) {
+  .navbar {
+    .right-menu .clock-wrapper {
+      display: none;
+    }
+  }
+}
+
+@media screen and (max-width: 991px) {
+  .navbar {
+    padding: 0 14px 0 12px;
+
+    .right-menu {
+      gap: 6px;
+    }
+
+    .avatar-container .avatar-wrapper {
+      padding-right: 6px;
+    }
+
+    .avatar-container .user-nickname,
+    .Btn .text {
+      display: none;
+    }
+  }
 }
 </style>

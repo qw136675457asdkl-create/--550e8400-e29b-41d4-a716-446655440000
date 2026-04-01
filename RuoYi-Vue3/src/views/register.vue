@@ -33,6 +33,35 @@
           </el-input>
         </el-form-item>
 
+        <el-form-item prop="phonenumber" class="custom-form-item">
+          <el-input
+            v-model="registerForm.phonenumber"
+            type="text"
+            size="large"
+            name="register_phone"
+            maxlength="11"
+            autocomplete="tel"
+            inputmode="numeric"
+            placeholder="手机号码"
+          >
+            <template #prefix><svg-icon icon-class="phone" class="el-input__icon input-icon" /></template>
+          </el-input>
+        </el-form-item>
+
+        <el-form-item prop="email" class="custom-form-item">
+          <el-input
+            v-model="registerForm.email"
+            type="text"
+            size="large"
+            name="register_email"
+            maxlength="50"
+            autocomplete="email"
+            placeholder="邮箱"
+          >
+            <template #prefix><svg-icon icon-class="email" class="el-input__icon input-icon" /></template>
+          </el-input>
+        </el-form-item>
+
         <el-form-item prop="password" class="custom-form-item password-form-item">
           <el-input
             v-model="registerForm.password"
@@ -123,6 +152,8 @@ const registerRef = ref()
 const registerForm = ref({
   username: "",
   nickName: "",
+  phonenumber: "",
+  email: "",
   password: "",
   confirmPassword: "",
   code: "",
@@ -204,6 +235,14 @@ const registerRules = {
   nickName: [
     { required: true, trigger: "blur", message: "请输入用户名称" },
     { min: 1, max: 30, message: "用户名称长度必须介于 1 和 30 之间", trigger: "blur" }
+  ],
+  phonenumber: [
+    { required: true, trigger: "blur", message: "请输入手机号码" },
+    { pattern: /^1[3-9]\d{9}$/, message: "请输入正确的手机号码", trigger: "blur" }
+  ],
+  email: [
+    { required: true, trigger: "blur", message: "请输入邮箱" },
+    { type: "email", message: "请输入正确的邮箱地址", trigger: ["blur", "change"] }
   ],
   password: [
     { required: true, trigger: "blur", message: "请输入您的密码" },

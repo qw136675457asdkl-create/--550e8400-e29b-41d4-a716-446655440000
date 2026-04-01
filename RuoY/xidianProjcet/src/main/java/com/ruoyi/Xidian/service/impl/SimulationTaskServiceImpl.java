@@ -49,20 +49,21 @@ public class SimulationTaskServiceImpl implements SimulationTaskService {
         task.setCreateBy(SecurityUtils.getUsername());
         task.setPath(dExperimentInfoService.getExperimentPath(task.getExperimentID()));
         taskMapper.insert(task);
-        Integer TaskGroups = task.getDataGroups().size();
-        redisCache.setCacheObject(task.getId().toString(), TaskGroups);
-        List<TaskDataGroup> dataGroups = task.getDataGroups();
-        dataGroups.forEach(group -> {
-            group.setTaskId(task.getId());
-            group.setStatus(TaskStatusEnum.DRAFT.toString());
-        });
-        taskDataGroupMapper.insertBatch(dataGroups);
-        for(TaskDataGroup group : dataGroups){
-            //将数据组(子任务)发送到RabbitMQ队列
-            group.setTaskId(task.getId());
-            group.setStatus(TaskStatusEnum.DRAFT.toString());
-            rabbitTemplate.convertAndSend(exchangeName, routingKey, group);
-        }
+//        Integer TaskGroups = task.getDataGroups().size();
+//        redisCache.setCacheObject(task.getId().toString(), TaskGroups);
+//        List<TaskDataGroup> dataGroups = task.getDataGroups();
+//        dataGroups.forEach(group -> {
+//            group.setTaskId(task.getId());
+//            group.setStatus(TaskStatusEnum.DRAFT.toString());
+//        });
+//        taskDataGroupMapper.insertBatch(dataGroups);
+//        for(TaskDataGroup group : dataGroups){
+//            //更新子任务状态
+//            group.setTaskId(task.getId());
+//            group.setStatus(TaskStatusEnum.DRAFT.toString());
+//        }
+        //将总任务表发给
+        rabbitTemplate.convertAndSend(exchangeName,routingKey,task);
     }
 
     @Override

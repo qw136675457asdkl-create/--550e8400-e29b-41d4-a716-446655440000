@@ -3,32 +3,36 @@
 :root {
   --admin-surface: #ffffff;
   --admin-surface-muted: #f8fafc;
-  --admin-fill-soft: #f3f4f6;
-  --admin-border: #d7dee7;
-  --admin-border-strong: #c4ced9;
-  --admin-text: #111827;
-  --admin-text-muted: #6b7280;
-  --admin-placeholder: #9ca3af;
-  --admin-table-header: #f3f4f6;
-  --admin-table-hover: #f9fafb;
-  --admin-primary-start: #1677ff;
-  --admin-primary-end: #0f5fe0;
-  --admin-primary-shadow: rgba(22, 119, 255, 0.26);
+  --admin-fill-soft: #f1f5f9;
+  --admin-border: #e2e8f0;
+  --admin-border-strong: #cbd5e1;
+  --admin-text: #0f172a;
+  --admin-text-muted: #64748b;
+  --admin-placeholder: #94a3b8;
+  --admin-table-header: #f8fafc;
+  --admin-table-hover: #f8fbff;
+  --admin-primary-start: #5b7cff;
+  --admin-primary-end: #405efe;
+  --admin-primary-shadow: rgba(64, 94, 254, 0.24);
+  --el-color-primary: #405efe;
+  --el-border-radius-base: 12px;
+  --el-border-radius-small: 8px;
+  --el-border-radius-round: 999px;
 }
 
 html.dark {
-  --admin-surface: #1f2937;
-  --admin-surface-muted: #111827;
+  --admin-surface: #111827;
+  --admin-surface-muted: #0f172a;
   --admin-fill-soft: #0f172a;
   --admin-border: #334155;
   --admin-border-strong: #475569;
   --admin-text: #e5e7eb;
   --admin-text-muted: #94a3b8;
   --admin-placeholder: #64748b;
-  --admin-table-header: #1e293b;
+  --admin-table-header: #0f172a;
   --admin-table-hover: #172033;
-  --admin-primary-start: #1677ff;
-  --admin-primary-end: #0f5fe0;
+  --admin-primary-start: #6f85ff;
+  --admin-primary-end: #405efe;
   --admin-primary-shadow: rgba(15, 23, 42, 0.38);
 }
 
@@ -167,7 +171,7 @@ html.dark {
   .el-input-number,
   .el-tree-select__wrapper {
     background: var(--admin-surface);
-    border-radius: 10px;
+    border-radius: var(--el-border-radius-base);
     box-shadow: 0 0 0 1px var(--admin-border) inset;
     transition: box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
   }
@@ -213,7 +217,7 @@ html.dark {
   .el-textarea__inner:focus,
   .el-input-number:focus-within {
     background: var(--admin-surface);
-    box-shadow: 0 0 0 1px #94a3b8 inset, 0 0 0 4px rgba(148, 163, 184, 0.16);
+    box-shadow: 0 0 0 1px rgba(64, 94, 254, 0.28) inset, 0 0 0 4px rgba(64, 94, 254, 0.12);
   }
 
   .el-form-item.is-error {
@@ -242,5 +246,134 @@ html.dark {
   .el-input.is-disabled .el-input__inner::placeholder {
     color: var(--admin-text-muted);
     -webkit-text-fill-color: var(--admin-text-muted);
+  }
+}
+
+.el-card {
+  border: none !important;
+  border-radius: calc(var(--el-border-radius-base) + 2px) !important;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05) !important;
+  background: var(--admin-surface);
+  overflow: hidden;
+}
+
+.el-card__header {
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+body {
+  .app-container,
+  .el-dialog,
+  .el-drawer {
+    .el-button:not(.is-link):not(.is-text):not(.el-button--text):not(.is-circle) {
+      min-height: 42px;
+      padding: 0 20px !important;
+      border-radius: var(--el-border-radius-base) !important;
+    }
+
+    .el-button.el-button--small:not(.is-link):not(.is-text):not(.el-button--text):not(.is-circle) {
+      min-height: 38px;
+      padding: 0 16px !important;
+      border-radius: 10px !important;
+    }
+
+    .el-button--primary:not(.is-link):not(.is-text):not(.el-button--text):not(.is-plain) {
+      background: linear-gradient(180deg, var(--admin-primary-start) 0%, var(--admin-primary-end) 100%) !important;
+      border: none !important;
+      box-shadow: 0 8px 18px var(--admin-primary-shadow), 0 2px 6px rgba(15, 23, 42, 0.08) !important;
+    }
+
+    .el-button--primary:not(.is-link):not(.is-text):not(.el-button--text):not(.is-plain):hover,
+    .el-button--primary:not(.is-link):not(.is-text):not(.el-button--text):not(.is-plain):focus {
+      background: linear-gradient(180deg, #6f85ff 0%, #405efe 100%) !important;
+      box-shadow: 0 10px 22px rgba(64, 94, 254, 0.28), 0 2px 8px rgba(15, 23, 42, 0.08) !important;
+    }
+  }
+
+  .el-table {
+    --el-table-border-color: rgba(226, 232, 240, 0.9) !important;
+    --el-table-header-bg-color: #f8fafc !important;
+    --el-table-header-text-color: #94a3b8 !important;
+    --el-table-row-hover-bg-color: #f8fbff !important;
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--admin-surface);
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);
+
+    &::before,
+    &.el-table--border::after,
+    &.el-table--group::after {
+      display: none !important;
+    }
+
+    .el-table__inner-wrapper::before {
+      background-color: rgba(226, 232, 240, 0.9) !important;
+    }
+
+    .el-table__header-wrapper,
+    .el-table__fixed-header-wrapper {
+      th {
+        background: #f8fafc !important;
+        color: #94a3b8 !important;
+        font-weight: 700 !important;
+        border-bottom: 1px solid rgba(226, 232, 240, 0.9) !important;
+      }
+    }
+
+    th.el-table__cell,
+    td.el-table__cell {
+      border-right: none !important;
+    }
+
+    td.el-table__cell {
+      color: #334155;
+      border-bottom: 1px solid #eef2f7 !important;
+    }
+
+    .el-table__body tr:hover > td.el-table__cell {
+      background: #f8fbff !important;
+    }
+  }
+}
+
+html.dark {
+  .el-card {
+    box-shadow: 0 12px 28px rgba(2, 6, 23, 0.28) !important;
+  }
+
+  .el-card__header {
+    border-bottom-color: rgba(51, 65, 85, 0.8);
+  }
+
+  body .el-table {
+    --el-table-border-color: #334155 !important;
+    --el-table-header-bg-color: #0f172a !important;
+    --el-table-header-text-color: #94a3b8 !important;
+    --el-table-row-hover-bg-color: #172033 !important;
+    border-color: #334155;
+    box-shadow: 0 12px 28px rgba(2, 6, 23, 0.22);
+
+    .el-table__inner-wrapper::before {
+      background-color: #334155 !important;
+    }
+
+    .el-table__header-wrapper,
+    .el-table__fixed-header-wrapper {
+      th {
+        background: #0f172a !important;
+        color: #94a3b8 !important;
+        border-bottom-color: #334155 !important;
+      }
+    }
+
+    td.el-table__cell {
+      color: #cbd5e1;
+      border-bottom-color: rgba(51, 65, 85, 0.9) !important;
+    }
+
+    .el-table__body tr:hover > td.el-table__cell {
+      background: #172033 !important;
+    }
   }
 }

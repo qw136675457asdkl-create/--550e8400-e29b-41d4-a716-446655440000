@@ -32,40 +32,22 @@ public class TaskListener {
     private RedisCache redisCache;
 
     @RabbitListener(queues = "simulation_task_queue")
-    public void handleTask(TaskDataGroup taskDataGroup, Channel channel, Message message) throws IOException {
+    public void handleTask(Task task, Channel channel, Message message) throws IOException {
         long deliveryTag = message.getMessageProperties().getDeliveryTag();
 
         // 1. 幂等检查：如果任务已经成功了，直接签收掉
-        TaskDataGroup currentTaskDataGroup = taskDataGroupMapper.selectById(taskDataGroup.getId());
-        if (TaskStatusEnum.SUCCESS.toString().equals(currentTaskDataGroup.getStatus())) {
+        Task currentTask = taskMapper.selectById(task.getId());
+        if (TaskStatusEnum.SUCCESS.toString().equals(currentTask.getStatus())) {
             channel.basicAck(deliveryTag, false);
             return;
         }
 
         try {
-            // 2. 更新状态为运行中
-            taskDataGroup.setStatus(TaskStatusEnum.RUNNING.toString());
-            taskDataGroupMapper.update(taskDataGroup);
-            //执行仿真任务中的每个数据项
-            Long startTime = taskDataGroup.getStartTimeMs();
-            Long endTime = taskDataGroup.getEndTimeMs();
-            List<TaskDataMetric> metricList = taskDataGroup.getMetricList();
+            //生成Json格式的数据发给Python
+            //1 把task taskgroup 等封装为taskDto ,将taskDTO转为JSON
             //调用仿真接口，获取仿真结果，模拟运算时间
             Thread.sleep(5000);
-            // 4. 运算成功：先改库，再 Ack
-            taskDataGroup.setStatus(TaskStatusEnum.SUCCESS.toString());
-            // 5. 从 Redis 中减 1
-            Integer taskGroups = redisCache.getCacheObject(taskDataGroup.getTaskId().toString());
-            taskGroups--;
-            redisCache.setCacheObject(taskDataGroup.getTaskId().toString(), taskGroups);
-            if(taskGroups == 0){
-                // 任务所有子任务都执行完成，标记为成功
-                Task task = taskMapper.selectById(taskDataGroup.getTaskId());
-                task.setStatus(TaskStatusEnum.SUCCESS.toString());
-                taskMapper.update(task);
-                redisCache.deleteObject(task.getId().toString());
-            }
-            taskDataGroupMapper.update(taskDataGroup);
+
             channel.basicAck(deliveryTag, false);
 
         } catch (Exception e) {
@@ -78,8 +60,8 @@ public class TaskListener {
                 channel.basicNack(deliveryTag, false, false);
             }else{
                 // 重试次数大于等于3次，标记为失败
-                taskDataGroup.setStatus(TaskStatusEnum.FAILED.toString());
-                taskDataGroupMapper.update(taskDataGroup);
+                currentTask.setStatus(TaskStatusEnum.FAILED.toString());
+                taskMapper.update(currentTask);
                 rabbitTemplate.send("retry_exchange", "final_routing", message);
                 channel.basicNack(deliveryTag, false, true);
                 throw new ServiceException("任务执行失败，请稍后再试");

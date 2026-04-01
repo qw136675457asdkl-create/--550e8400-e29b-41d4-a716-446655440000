@@ -24,8 +24,10 @@
     left: 0;
     z-index: 1001;
     overflow: hidden;
-    -webkit-box-shadow: 2px 0 6px rgba(0,21,41,.35);
-    box-shadow: 0px 0px 8px 0px rgba(0, 0, 0, 0.1);
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--navbar-border, rgba(226, 232, 240, 0.88));
+    -webkit-box-shadow: 0 18px 38px rgba(15, 23, 42, 0.08);
+    box-shadow: 0 18px 38px rgba(15, 23, 42, 0.08);
 
     // reset element-ui css
     .horizontal-collapse-transition {
@@ -34,6 +36,7 @@
 
     .scrollbar-wrapper {
       overflow-x: hidden !important;
+      padding: 8px 0 14px;
     }
 
     .el-scrollbar__bar.is-vertical {
@@ -61,7 +64,7 @@
     }
 
     .svg-icon {
-      margin-right: 10px !important;
+      margin-right: 12px !important;
     }
 
     .el-menu {
@@ -84,7 +87,7 @@
     .sub-menu-title-noDropdown,
     .el-sub-menu__title {
       &:hover {
-        background-color: rgba(0, 0, 0, 0.06) !important;
+        background-color: transparent !important;
       }
     }
 
@@ -97,16 +100,16 @@
       min-width: vars.$base-sidebar-width !important;
 
       &:hover {
-        background-color: rgba(0, 0, 0, 0.06) !important;
+        background-color: transparent !important;
       }
     }
 
     & .theme-dark .nest-menu .el-sub-menu>.el-sub-menu__title,
     & .theme-dark .el-sub-menu .el-menu-item {
-      background-color: vars.$base-sub-menu-background;
+      background-color: transparent;
 
       &:hover {
-        background-color: vars.$base-sub-menu-hover !important;
+        background-color: transparent !important;
       }
     }
   }
@@ -212,8 +215,7 @@
   .nest-menu .el-sub-menu>.el-sub-menu__title,
   .el-menu-item {
     &:hover {
-      // you can use $sub-menuHover
-      background-color: rgba(0, 0, 0, 0.06) !important;
+      background-color: transparent !important;
     }
   }
 

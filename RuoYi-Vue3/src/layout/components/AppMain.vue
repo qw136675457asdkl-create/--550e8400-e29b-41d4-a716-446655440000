@@ -1,12 +1,16 @@
 <template>
   <section class="app-main">
-    <router-view v-slot="{ Component, route }">
-      <transition name="fade-transform" mode="out-in">
-        <keep-alive :include="tagsViewStore.cachedViews">
-          <component v-if="!route.meta.link" :is="Component" :key="route.path"/>
-        </keep-alive>
-      </transition>
-    </router-view>
+    <div class="app-main__viewport">
+      <div class="app-main__content">
+        <router-view v-slot="{ Component, route }">
+          <transition name="fade-transform" mode="out-in">
+            <keep-alive :include="tagsViewStore.cachedViews">
+              <component v-if="!route.meta.link" :is="Component" :key="route.path" />
+            </keep-alive>
+          </transition>
+        </router-view>
+      </div>
+    </div>
     <iframe-toggle />
     <copyright />
   </section>
@@ -37,17 +41,31 @@ function addIframe() {
 
 <style lang="scss" scoped>
 .app-main {
-  /* 50= navbar  50  */
-  min-height: calc(100vh - 50px);
+  min-height: calc(100vh - 60px);
   width: 100%;
   position: relative;
   overflow: hidden;
+  background: var(--app-main-bg, #f1f5f9);
+}
+
+.app-main__viewport {
+  min-height: 100%;
+  padding: 20px;
+  background: var(--app-main-bg, #f1f5f9);
+}
+
+.app-main__content {
+  min-height: 100%;
+}
+
+.app-main__content :deep(.app-container) {
+  padding: 0;
 }
 
 .fixed-header + .app-main {
   overflow-y: auto;
   scrollbar-gutter: auto;
-  height: calc(100vh - 50px);
+  height: calc(100vh - 60px);
   min-height: 0px;
 }
 
@@ -56,24 +74,26 @@ function addIframe() {
 }
 
 .fixed-header + .app-main {
-  margin-top: 50px;
+  margin-top: 60px;
 }
 
 .hasTagsView {
   .app-main {
-    /* 84 = navbar + tags-view = 50 + 34 */
-    min-height: calc(100vh - 84px);
+    min-height: calc(100vh - 94px);
   }
 
   .fixed-header + .app-main {
-    margin-top: 84px;
-    height: calc(100vh - 84px);
+    margin-top: 94px;
+    height: calc(100vh - 94px);
     min-height: 0px;
   }
 }
 
-/* 移动端fixed-header优化 */
 @media screen and (max-width: 991px) {
+  .app-main__viewport {
+    padding: 16px;
+  }
+
   .fixed-header + .app-main {
     padding-bottom: max(60px, calc(constant(safe-area-inset-bottom) + 40px));
     padding-bottom: max(60px, calc(env(safe-area-inset-bottom) + 40px));
@@ -92,15 +112,15 @@ function addIframe() {
     .fixed-header + .app-main {
       padding-bottom: max(17px, calc(constant(safe-area-inset-bottom) + 10px));
       padding-bottom: max(17px, calc(env(safe-area-inset-bottom) + 10px));
-      height: calc(100svh - 50px);
-      height: calc(100dvh - 50px);
+      height: calc(100svh - 60px);
+      height: calc(100dvh - 60px);
     }
 
     .hasTagsView .fixed-header + .app-main {
       padding-bottom: max(17px, calc(constant(safe-area-inset-bottom) + 10px));
       padding-bottom: max(17px, calc(env(safe-area-inset-bottom) + 10px));
-      height: calc(100svh - 84px);
-      height: calc(100dvh - 84px);
+      height: calc(100svh - 94px);
+      height: calc(100dvh - 94px);
     }
   }
 }
