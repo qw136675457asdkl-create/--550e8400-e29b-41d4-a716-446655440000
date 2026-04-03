@@ -36,8 +36,15 @@ public class WebSocketServer {
     // 自定义单发消息方法
     public void sendText(Long userId, String message) {
         Session session = sessionPool.get(userId);
+        System.out.println("准备发送 userId=" + userId);
+        System.out.println("当前在线用户=" + sessionPool.keySet());
+        System.out.println("session=" + session);
+
         if (session != null && session.isOpen()) {
             session.getAsyncRemote().sendText(message);
+            System.out.println("消息已提交发送: " + message);
+        } else {
+            System.out.println("发送失败，session 不存在或未打开");
         }
     }
 }

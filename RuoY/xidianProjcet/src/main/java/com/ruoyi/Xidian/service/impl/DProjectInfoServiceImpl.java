@@ -73,8 +73,7 @@ public class DProjectInfoServiceImpl implements IDProjectInfoService
             {
                 if (Files.exists(path))
                 {
-                    pathStr = projectName + UUID.randomUUID().toString().substring(0, 5);
-                    continue;
+                    throw new ServiceException("项目名称重复");
                 }
 
                 try

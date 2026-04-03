@@ -90,6 +90,7 @@ public class DBussinessDataInfoController extends BaseController
             ddataInfo = ddataService.selectDdataInfoByDdataId(id);
         }
         catch (Exception e) {
+
             throw new ServiceException("查询业务数据详情失败");
         }
         if (ddataInfo != null && StringUtils.isNotEmpty(ddataInfo.getDataFilePath()))

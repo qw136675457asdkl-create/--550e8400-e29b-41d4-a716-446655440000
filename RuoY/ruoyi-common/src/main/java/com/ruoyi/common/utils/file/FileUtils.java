@@ -406,7 +406,7 @@ public class FileUtils
         File file = new File(filePath);
         if (!file.exists())
         {
-            throw new ServiceException("File does not exist");
+            throw new ServiceException("文件不存在");
         }
 
         int safePageNum = pageNum <= 0 ? 1 : pageNum;

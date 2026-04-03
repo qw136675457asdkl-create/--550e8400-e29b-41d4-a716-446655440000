@@ -11,6 +11,8 @@ ruoyi:
 
   # 备份目录
   backupDir: /home/hyy1208/backupdata
+  #项目所在路径
+  projectPath: /home/hyy1208/xidianProject/xd_project/xidianProject/DateCreate
   # 获取ip地址开关
   addressEnabled: false
   # 验证码类型 math 数字计算 char 字符验证
@@ -22,7 +24,7 @@ ruoyi:
 # 开发环境配置
 server:
   # 服务器的HTTP端口
-  port: 8081
+  port: 8082
   servlet:
     # 应用的访问路径
     context-path: /
@@ -71,6 +73,14 @@ spring:
     listener:
       simple:
         acknowledge-mode: manual
+    connection-timeout: 1s # 连接超时时间
+    template:
+      retry:
+        max-attempts: 3
+
+        enabled: true
+        initial-interval: 1s
+        multiplier: 2 # 重试间隔倍数
   # 文件上传
   servlet:
     multipart:
@@ -158,3 +168,13 @@ third-api:
     key: "123456789"
     # 高德行政区域查询接口
     district-url: "https://restapi.amap.com/v3/config/district"
+simulation:
+  python:
+    api-base-url: ${SIMULATION_PYTHON_API_BASE_URL:http://127.0.0.1:5000}
+    api-connect-timeout-seconds: ${SIMULATION_PYTHON_API_CONNECT_TIMEOUT_SECONDS:10}
+    api-read-timeout-seconds: ${SIMULATION_PYTHON_API_READ_TIMEOUT_SECONDS:600}
+    api-task-timeout-seconds: ${SIMULATION_PYTHON_API_TASK_TIMEOUT_SECONDS:600}
+    api-poll-interval-millis: ${SIMULATION_PYTHON_API_POLL_INTERVAL_MILLIS:500}
+    local-data-root: ${SIMULATION_PYTHON_LOCAL_DATA_ROOT:${ruoyi.profile}/data}
+    output-base-dir: ${SIMULATION_PYTHON_OUTPUT_BASE_DIR:${ruoyi.profile}/data}
+    default-output-directory: ${SIMULATION_PYTHON_DEFAULT_OUTPUT_DIRECTORY:csv_output/api_requests}

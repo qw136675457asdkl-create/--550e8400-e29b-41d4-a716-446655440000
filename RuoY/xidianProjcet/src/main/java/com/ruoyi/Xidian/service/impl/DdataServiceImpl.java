@@ -13,9 +13,11 @@ import com.ruoyi.common.config.RuoYiConfig;
 import com.ruoyi.common.constant.CacheConstants;
 import com.ruoyi.common.core.redis.RedisCache;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.exception.file.InvalidExtensionException;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.file.FileUploadUtils;
+import com.ruoyi.common.utils.file.MimeTypeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -349,12 +351,13 @@ public class DdataServiceImpl implements IDdataService
             throw new ServiceException("文件名不能为空");
         }
 
+        String normalizedOriginalFilename = Paths.get(originalFilename).getFileName().toString();
         DExperimentInfo experimentInfo = requireExperiment(ddataInfo.getExperimentId());
         DProjectInfo projectInfo = requireProject(experimentInfo.getProjectId());
-        String filePath = "/data" + BuildDataFilePath(ddataInfo);
         Path projectRoot = buildProjectRootPath(projectInfo);
         Path experimentRoot = buildExperimentRootPath(projectInfo, experimentInfo);
-        Path targetPath = resolveAbsoluteDataPath(experimentRoot, "/" + originalFilename);
+        String targetDataFilePath = buildImportedDataFilePath(normalizedOriginalFilename);
+        Path targetPath = resolveAbsoluteDataPath(experimentRoot, targetDataFilePath);
 
         try
         {
@@ -362,53 +365,28 @@ public class DdataServiceImpl implements IDdataService
                     buildLockPaths(projectRoot, experimentRoot),
                     buildLockPaths(targetPath)))
             {
-                DdataInfo oldInfo = ddataMapper.selectSameNameFile(ddataInfo.getExperimentId(), "/" + originalFilename);
-                if (oldInfo != null)
+                Path parentPath = targetPath.getParent();
+                if (parentPath != null && Files.notExists(parentPath))
                 {
-                    ddataInfo.setId(oldInfo.getId());
-
-                    if (ddataInfo.getSampleFrequency() == null)
-                    {
-                        ddataInfo.setSampleFrequency(oldInfo.getSampleFrequency());
-                    }
-                    if (ddataInfo.getDeviceId() == null)
-                    {
-                        ddataInfo.setDeviceId(oldInfo.getDeviceId());
-                    }
-                    if (ddataInfo.getDeviceInfo() == null)
-                    {
-                        ddataInfo.setDeviceInfo(oldInfo.getDeviceInfo());
-                    }
-                    if (ddataInfo.getWorkStatus() == null)
-                    {
-                        ddataInfo.setWorkStatus(oldInfo.getWorkStatus());
-                    }
+                    Files.createDirectories(parentPath);
                 }
 
-                if (Files.exists(targetPath))
-                {
-                    Files.delete(targetPath);
-                }
-                FileUploadUtils.upload(filePath, file);
+                FileUploadUtils.assertAllowed(file, MimeTypeUtils.DEFAULT_ALLOWED_EXTENSION);
+                file.transferTo(targetPath);
 
                 ddataInfo.setCreateBy(SecurityUtils.getUsername());
-                ddataInfo.setDataFilePath("/" + originalFilename);
+                ddataInfo.setDataFilePath(targetDataFilePath);
                 ddataInfo.setTargetType(
                         dTargetInfoMapper.selectDTargetInfoByTargetId(ddataInfo.getTargetId()).getTargetType()
                 );
-
-                if (oldInfo != null)
-                {
-                    ddataInfo.setId(oldInfo.getId());
-                    redisCache.deleteObject(CacheConstants.DATA_INFO_KEY + oldInfo.getId());
-                    return ddataMapper.updateDdataInfo(ddataInfo);
-                }
 
                 ddataInfo.setSampleFrequency(1000);
                 ddataInfo.setDeviceId(null);
                 ddataInfo.setDeviceInfo(null);
                 ddataInfo.setWorkStatus("completed");
                 return ddataMapper.insertDdataInfo(ddataInfo);
+            } catch (InvalidExtensionException e) {
+                throw new RuntimeException(e);
             }
         }
         catch (IOException e)
@@ -454,6 +432,68 @@ public class DdataServiceImpl implements IDdataService
             catch (IOException e)
             {
                 throw new ServiceException("文件上传失败: " + e.getMessage());
+            }
+        }
+    }
+
+    @Override
+    public void syncSimulationResultFiles(
+            String experimentId,
+            List<String> storedFileNames,
+            List<String> sourceFileNames,
+            Integer sampleFrequency,
+            String createBy,
+            String targetCategory)
+    {
+        if (StringUtils.isEmpty(experimentId) || StringUtils.isEmpty(storedFileNames))
+        {
+            return;
+        }
+        int index = 0;
+
+        DExperimentInfo experimentInfo = requireExperiment(experimentId);
+        DProjectInfo projectInfo = requireProject(experimentInfo.getProjectId());
+        Path projectRoot = buildProjectRootPath(projectInfo);
+        Path experimentRoot = buildExperimentRootPath(projectInfo, experimentInfo);
+
+        for (String storedFileName : storedFileNames)
+        {
+            if (StringUtils.isEmpty(storedFileName))
+            {
+                index++;
+                continue;
+            }
+
+            String normalizedFileName = Paths.get(storedFileName.trim()).getFileName().toString();
+            String dataFilePath = normalizeDataFilePath("/" + normalizedFileName);
+            Path targetPath = resolveAbsoluteDataPath(experimentRoot, dataFilePath);
+
+            try (PathLockManager.LockHandle ignored = pathLockManager.lockRead(projectRoot, experimentRoot, targetPath))
+            {
+                if (Files.notExists(targetPath) || Files.isDirectory(targetPath))
+                {
+                    throw new ServiceException("生成文件不存在: " + normalizedFileName);
+                }
+
+                DdataInfo ddataInfo = buildSimulationResultDataInfo(
+                        experimentInfo,
+                        dataFilePath,
+                        sourceFileNames.get(index),
+                        sampleFrequency,
+                        createBy,
+                        targetCategory);
+                DdataInfo oldInfo = ddataMapper.selectSameNameFile(experimentId, dataFilePath);
+                if (oldInfo != null)
+                {
+                    mergeExistingSimulationDataInfo(ddataInfo, oldInfo);
+                    redisCache.deleteObject(CacheConstants.DATA_INFO_KEY + oldInfo.getId());
+                    ddataMapper.updateDdataInfo(ddataInfo);
+                    index++;
+                    continue;
+                }
+
+                ddataMapper.insertDdataInfo(ddataInfo);
+                index++;
             }
         }
     }
@@ -751,6 +791,128 @@ public class DdataServiceImpl implements IDdataService
         List<Integer> ids = new ArrayList<>();
         ids.add(id);
         return ids;
+    }
+
+    private String buildImportedDataFilePath(String originalFilename)
+    {
+        String normalizedOriginalPath = normalizeDataFilePath("/" + originalFilename);
+        String baseName = extractBaseName(normalizedOriginalPath);
+        String suffix = extractSuffix(normalizedOriginalPath);
+        String uniqueBaseName = baseName + "_" + UUID.randomUUID().toString().replace("-", "");
+        return buildDataFilePath("/", uniqueBaseName, suffix);
+    }
+
+    private DdataInfo buildSimulationResultDataInfo(
+            DExperimentInfo experimentInfo,
+            String dataFilePath,
+            String sourceFileName,
+            Integer sampleFrequency,
+            String createBy,
+            String targetCategory)
+    {
+        String normalizedDataFilePath = normalizeDataFilePath(dataFilePath);
+        DdataInfo ddataInfo = new DdataInfo();
+        ddataInfo.setExperimentId(experimentInfo.getExperimentId());
+        ddataInfo.setTargetId(experimentInfo.getTargetId());
+        ddataInfo.setTargetType(resolveExperimentTargetType(experimentInfo));
+        ddataInfo.setTargetCategory(resolveSimulationTargetCategory(targetCategory, experimentInfo, normalizedDataFilePath));
+        ddataInfo.setDataName(sourceFileName);
+        ddataInfo.setDataType(resolveExperimentDataType(normalizedDataFilePath));
+        ddataInfo.setDataFilePath(normalizedDataFilePath);
+        ddataInfo.setSampleFrequency(resolveSimulationSampleFrequency(sampleFrequency));
+        ddataInfo.setDeviceId(null);
+        ddataInfo.setDeviceInfo(null);
+        ddataInfo.setWorkStatus("completed");
+        ddataInfo.setIsSimulation(Boolean.TRUE);
+        ddataInfo.setCreateBy(resolveSimulationCreateBy(createBy, experimentInfo));
+        return ddataInfo;
+    }
+
+    private void mergeExistingSimulationDataInfo(DdataInfo ddataInfo, DdataInfo oldInfo)
+    {
+        ddataInfo.setId(oldInfo.getId());
+        if (ddataInfo.getTargetId() == null)
+        {
+            ddataInfo.setTargetId(oldInfo.getTargetId());
+        }
+        if (ddataInfo.getTargetType() == null)
+        {
+            ddataInfo.setTargetType(oldInfo.getTargetType());
+        }
+        if (ddataInfo.getTargetCategory() == null)
+        {
+            ddataInfo.setTargetCategory(oldInfo.getTargetCategory());
+        }
+        if (ddataInfo.getSampleFrequency() == null)
+        {
+            ddataInfo.setSampleFrequency(oldInfo.getSampleFrequency());
+        }
+        if (ddataInfo.getDeviceId() == null)
+        {
+            ddataInfo.setDeviceId(oldInfo.getDeviceId());
+        }
+        if (ddataInfo.getDeviceInfo() == null)
+        {
+            ddataInfo.setDeviceInfo(oldInfo.getDeviceInfo());
+        }
+        if (ddataInfo.getWorkStatus() == null)
+        {
+            ddataInfo.setWorkStatus(oldInfo.getWorkStatus());
+        }
+        if (ddataInfo.getExtAttr() == null)
+        {
+            ddataInfo.setExtAttr(oldInfo.getExtAttr());
+        }
+        if (ddataInfo.getIsSimulation() == null)
+        {
+            ddataInfo.setIsSimulation(oldInfo.getIsSimulation());
+        }
+    }
+
+    private Integer resolveSimulationSampleFrequency(Integer sampleFrequency)
+    {
+        if (sampleFrequency == null || sampleFrequency <= 0)
+        {
+            return 1000;
+        }
+        return sampleFrequency;
+    }
+
+    private String resolveSimulationCreateBy(String createBy, DExperimentInfo experimentInfo)
+    {
+        if (StringUtils.isNotEmpty(createBy))
+        {
+            return createBy.trim();
+        }
+        if (experimentInfo != null && StringUtils.isNotEmpty(experimentInfo.getCreateBy()))
+        {
+            return experimentInfo.getCreateBy().trim();
+        }
+        return "system";
+    }
+
+    private String resolveSimulationTargetCategory(
+            String targetCategory,
+            DExperimentInfo experimentInfo,
+            String dataFilePath)
+    {
+        if (StringUtils.isNotEmpty(targetCategory))
+        {
+            return targetCategory.trim();
+        }
+
+        String resolvedTargetType = resolveExperimentTargetType(experimentInfo);
+        if (StringUtils.isNotEmpty(resolvedTargetType))
+        {
+            return resolvedTargetType;
+        }
+
+        String resolvedDataType = resolveExperimentDataType(dataFilePath);
+        if (StringUtils.isNotEmpty(resolvedDataType))
+        {
+            return resolvedDataType;
+        }
+        return "simulation";
     }
 
     private String normalizeFileName(String fileName, String fallbackDataPath)

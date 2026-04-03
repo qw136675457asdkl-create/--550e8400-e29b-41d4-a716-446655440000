@@ -23,10 +23,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 @Service
@@ -165,8 +165,7 @@ public class DExperimentInfoServiceImpl implements IDExperimentInfoService
             {
                 if (Files.exists(experimentPath))
                 {
-                    pathStr = dExperimentInfo.getExperimentName() + UUID.randomUUID().toString().substring(0, 5);
-                    continue;
+                    throw new ServiceException("同一项目下不允许有相同的试验名称");
                 }
 
                 try
@@ -280,7 +279,7 @@ public class DExperimentInfoServiceImpl implements IDExperimentInfoService
             {
                 try
                 {
-                    if (isDirectoryNotEmpty(experimentPath))
+                    if (containsFilesInTree(experimentPath))
                     {
                         errorMsg.append("试验目录不为空: ")
                                 .append(experimentPath)
@@ -298,7 +297,7 @@ public class DExperimentInfoServiceImpl implements IDExperimentInfoService
 
                 try
                 {
-                    Files.deleteIfExists(experimentPath);
+                    deleteDirectoryTree(experimentPath);
                 }
                 catch (IOException e)
                 {
@@ -341,7 +340,7 @@ public class DExperimentInfoServiceImpl implements IDExperimentInfoService
         {
             try
             {
-                if (isDirectoryNotEmpty(experimentPath))
+                if (containsFilesInTree(experimentPath))
                 {
                     throw new ServiceException("试验目录不为空");
                 }
@@ -353,7 +352,7 @@ public class DExperimentInfoServiceImpl implements IDExperimentInfoService
 
             try
             {
-                Files.deleteIfExists(experimentPath);
+                deleteDirectoryTree(experimentPath);
             }
             catch (IOException e)
             {
@@ -413,26 +412,70 @@ public class DExperimentInfoServiceImpl implements IDExperimentInfoService
         return result;
     }
 
-    private boolean isDirectoryNotEmpty(Path directory) throws IOException
+    private boolean containsFilesInTree(Path directory) throws IOException
     {
         if (Files.notExists(directory))
         {
             return false;
         }
-        try (Stream<Path> stream = Files.list(directory))
+        try (Stream<Path> stream = Files.walk(directory))
         {
-            return stream.findAny().isPresent();
+            return stream.anyMatch(path -> !path.equals(directory) && Files.isRegularFile(path));
+        }
+    }
+
+    private void deleteDirectoryTree(Path directory) throws IOException
+    {
+        if (Files.notExists(directory))
+        {
+            return;
+        }
+        try (Stream<Path> stream = Files.walk(directory))
+        {
+            stream.sorted(
+                            Comparator.comparingInt(Path::getNameCount)
+                                    .reversed()
+                                    .thenComparing(Path::toString, Comparator.reverseOrder()))
+                    .forEach(path ->
+                    {
+                        try
+                        {
+                            Files.deleteIfExists(path);
+                        }
+                        catch (IOException e)
+                        {
+                            throw new RuntimeException(e);
+                        }
+                    });
+        }
+        catch (RuntimeException e)
+        {
+            if (e.getCause() instanceof IOException)
+            {
+                throw (IOException) e.getCause();
+            }
+            throw e;
         }
     }
     public String getExperimentPath(String experimentId){
         if(redisCache.getCacheObject(CacheConstants.EXPERIMENT_PATH_KEY + experimentId) != null){
             return redisCache.getCacheObject(CacheConstants.EXPERIMENT_PATH_KEY + experimentId).toString();
         }
+        String relativePath = getExperimentRelativePath(experimentId);
+        redisCache.setCacheObject(CacheConstants.EXPERIMENT_PATH_KEY + experimentId, profile + relativePath);
+        return profile + relativePath;
+    }
+
+    @Override
+    public String getExperimentRelativePath(String experimentId){
         DExperimentInfo experimentInfo = dExperimentInfoMapper.selectDExperimentInfoByExperimentId(experimentId);
+        if (experimentInfo == null)
+        {
+            throw new ServiceException("试验不能为空?");
+        }
         String experimentPath = experimentInfo.getPath();
         String projectPath = requireProject(experimentInfo.getProjectId()).getPath();
-        redisCache.setCacheObject(CacheConstants.EXPERIMENT_PATH_KEY + experimentId, profile + projectPath + experimentPath);
-        return profile + projectPath + experimentPath;
+        return projectPath + experimentPath;
     }
 
     //返回前端所需的试验信息路径（./data/项目路径/试验路径/）

@@ -6,34 +6,34 @@ import java.math.BigDecimal;
 //坐标值对象
 public class Coordinate implements Serializable {
     private static final long serialVersionUID = 1L;
-    private BigDecimal longitude;
-    private BigDecimal latitude;
-    private BigDecimal altitude;
+    private BigDecimal lon;
+    private BigDecimal lat;
+    private BigDecimal alt;
 
     public Coordinate() {
     }
-    public Coordinate(BigDecimal longitude, BigDecimal latitude, BigDecimal altitude) {
-        this.longitude = longitude;
-        this.latitude = latitude;
-        this.altitude = altitude;
+    public Coordinate(BigDecimal lon, BigDecimal lat, BigDecimal alt) {
+        this.lon = lon;
+        this.lat = lat;
+        this.alt = alt;
     }
     // getter/setter
-    public BigDecimal getLongitude() {
-        return longitude;
+    public BigDecimal getLon() {
+        return lon;
     }
-    public void setLongitude(BigDecimal longitude) {
-        this.longitude = longitude;
+    public void setLon(BigDecimal lon) {
+        this.lon = lon;
     }
-    public BigDecimal getLatitude() {
-        return latitude;
+    public BigDecimal getLat() {
+        return lat;
     }
-    public void setLatitude(BigDecimal latitude) {
-        this.latitude = latitude;
+    public void setLat(BigDecimal lat) {
+        this.lat = lat;
     }
-    public BigDecimal getAltitude() {
-        return altitude;
+    public BigDecimal getAlt() {
+        return alt;
     }
-    public void setAltitude(BigDecimal altitude) {
-        this.altitude = altitude;
+    public void setAlt(BigDecimal alt) {
+        this.alt = alt;
     }
 }

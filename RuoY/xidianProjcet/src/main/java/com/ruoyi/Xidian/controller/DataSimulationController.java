@@ -1,70 +1,96 @@
 package com.ruoyi.Xidian.controller;
 
+import com.ruoyi.Xidian.domain.DTO.TaskCreateRequest;
 import com.ruoyi.Xidian.domain.Task;
+import com.ruoyi.Xidian.service.IDExperimentInfoService;
+import com.ruoyi.Xidian.service.SimulationMetricTemplateService;
 import com.ruoyi.Xidian.service.SimulationTaskService;
+import com.ruoyi.common.annotation.Log;
+import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.page.TableDataInfo;
-import org.springframework.web.bind.annotation.*;
+import com.ruoyi.common.enums.BusinessType;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.ArrayList;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
-
-import static com.ruoyi.common.utils.PageUtils.startPage;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @RestController
 @RequestMapping("/data/simulation")
-public class DataSimulationController {
+public class DataSimulationController extends BaseController {
     private final SimulationTaskService simulationTaskService;
-    public DataSimulationController(SimulationTaskService simulationTaskService) {
+    private final IDExperimentInfoService experimentInfoService;
+    private final SimulationMetricTemplateService simulationMetricTemplateService;
+
+    public DataSimulationController(
+            SimulationTaskService simulationTaskService,
+            IDExperimentInfoService experimentInfoService,
+            SimulationMetricTemplateService simulationMetricTemplateService
+    ) {
         this.simulationTaskService = simulationTaskService;
+        this.experimentInfoService = experimentInfoService;
+        this.simulationMetricTemplateService = simulationMetricTemplateService;
     }
 
     @GetMapping("/task/list")
     public TableDataInfo taskList(Task task) {
         startPage();
-        List<Task> tasks = new ArrayList<>();
-        try{
-            tasks = simulationTaskService.selectTaskList(task);
-        }catch (Exception e){
-            throw new RuntimeException("获取任务列表失败");
-        }
-        return new TableDataInfo(tasks, tasks.size());
+        return getDataTable(simulationTaskService.selectTaskList(task));
     }
 
+    @PreAuthorize("@ss.hasPermi('data:simulation:insert')")
     @PostMapping("/task/submit")
-    public AjaxResult submitTask(Task task) {
-        AjaxResult ajaxResult = AjaxResult.success();
-        try{
-            simulationTaskService.insert(task);
-        }catch (Exception e){
-            AjaxResult.error("提交任务失败");
-        }
-        return AjaxResult.success();
+    @Log(title = "提交仿真任务",businessType = BusinessType.INSERT)
+    public AjaxResult submitTask(@RequestBody TaskCreateRequest request) {
+        return success(simulationTaskService.insert(request));
     }
 
     @GetMapping("/task/{id}")
     public AjaxResult taskDetail(@PathVariable Long id) {
-        AjaxResult ajaxResult = AjaxResult.success();
-        try{
-            Task task = simulationTaskService.selectById(id);
-            if(task == null){
-                throw new RuntimeException("任务不存在");
-            }
-            ajaxResult.put("data", task);
-        }catch (Exception e){
-            throw new RuntimeException("获取任务详情失败");
-        }
-        return ajaxResult;
+        return success(simulationTaskService.selectById(id));
     }
 
+    @PreAuthorize("@ss.hasPermi('data:simulation:delete')")
     @DeleteMapping("/task/{id}")
+    @Log(title = "删除仿真任务",businessType = BusinessType.DELETE)
     public AjaxResult deleteTask(@PathVariable Long id) {
-        AjaxResult ajaxResult = AjaxResult.success();
-        try{
-            simulationTaskService.deleteTask(id);
-        }catch (Exception e){
-            throw new RuntimeException("删除任务失败");
+        simulationTaskService.deleteTask(id);
+        return success();
+    }
+
+    @GetMapping("/metric/templates")
+    public AjaxResult listMetricTemplates() {
+        return success(simulationMetricTemplateService.listTemplates());
+    }
+
+    @GetMapping("/experiment/{experimentId}/files")
+    public AjaxResult listExperimentFiles(@PathVariable String experimentId) throws IOException {
+        Path experimentPath = Paths.get(experimentInfoService.getExperimentPath(experimentId));
+        if (!Files.exists(experimentPath) || !Files.isDirectory(experimentPath)) {
+            return success(Collections.emptyList());
         }
-        return ajaxResult;
+
+        try (Stream<Path> stream = Files.list(experimentPath)) {
+            List<String> files = stream
+                    .filter(Files::isRegularFile)
+                    .map(path -> path.getFileName().toString())
+                    .sorted(Comparator.naturalOrder())
+                    .collect(Collectors.toList());
+            return success(files);
+        }
     }
 }

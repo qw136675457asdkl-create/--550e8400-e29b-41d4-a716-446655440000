@@ -1,40 +1,42 @@
 package com.ruoyi.Xidian.domain;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 
 //速度向量
-public class Vector3 {
+public class Vector3 implements Serializable {
+    private static final long serialVersionUID = 1L;
     //经
-    private BigDecimal x;
+    private BigDecimal vx;
     //纬
-    private BigDecimal y;
+    private BigDecimal vy;
     //高
-    private BigDecimal z;
+    private BigDecimal vz;
 
     // getter/setter
     public Vector3() {
     }
-    public Vector3(BigDecimal x, BigDecimal y, BigDecimal z) {
-        this.x = x;
-        this.y = y;
-        this.z = z;
+    public Vector3(BigDecimal vx, BigDecimal vy, BigDecimal vz) {
+        this.vx = vx;
+        this.vy = vy;
+        this.vz = vz;
     }
-    public void setX(BigDecimal x) {
-        this.x = x;
+    public void setVx(BigDecimal vx) {
+        this.vx = vx;
     }
-    public void setY(BigDecimal y) {
-        this.y = y;
+    public void setVy(BigDecimal vy) {
+        this.vy = vy;
     }
-    public void setZ(BigDecimal z) {
-        this.z = z;
+    public void setVz(BigDecimal vz) {
+        this.vz = vz;
     }
-    public BigDecimal getX() {
-        return x;
+    public BigDecimal getVx() {
+        return vx;
     }
-    public BigDecimal getY() {
-        return y;
+    public BigDecimal getVy() {
+        return vy;
     }
-    public BigDecimal getZ() {
-        return z;
+    public BigDecimal getVz() {
+        return vz;
     }
 }

@@ -2,6 +2,7 @@ package com.ruoyi.Xidian.domain.DTO;
 
 import com.ruoyi.Xidian.domain.Attitude;
 import com.ruoyi.Xidian.domain.Coordinate;
+import com.ruoyi.Xidian.domain.RandomSeeds;
 import com.ruoyi.Xidian.domain.Vector3;
 
 import java.util.List;
@@ -9,6 +10,7 @@ import java.util.List;
 public class TaskCreateRequest {
     private String taskName;
     private Long projectId;
+    private String experimentId;
     private Long testId;
 
     private String carrierType;
@@ -16,8 +18,9 @@ public class TaskCreateRequest {
 
     private Coordinate startCoordinate;
     private Coordinate endCoordinate;
-    private Vector3 startSpeed;
+    private Vector3 startVelocity;
     private Attitude startAttitude;
+    private RandomSeeds randomSeeds;
 
     private List<TaskDataGroupDTO> dataGroups;
 
@@ -36,6 +39,14 @@ public class TaskCreateRequest {
 
     public void setProjectId(Long projectId) {
         this.projectId = projectId;
+    }
+
+    public String getExperimentId() {
+        return experimentId;
+    }
+
+    public void setExperimentId(String experimentId) {
+        this.experimentId = experimentId;
     }
 
     public Long getTestId() {
@@ -78,12 +89,12 @@ public class TaskCreateRequest {
         this.endCoordinate = endCoordinate;
     }
 
-    public Vector3 getStartSpeed() {
-        return startSpeed;
+    public Vector3 getStartVelocity() {
+        return startVelocity;
     }
 
-    public void setStartSpeed(Vector3 startSpeed) {
-        this.startSpeed = startSpeed;
+    public void setStartVelocity(Vector3 startVelocity) {
+        this.startVelocity = startVelocity;
     }
 
     public Attitude getStartAttitude() {
@@ -92,6 +103,14 @@ public class TaskCreateRequest {
 
     public void setStartAttitude(Attitude startAttitude) {
         this.startAttitude = startAttitude;
+    }
+
+    public RandomSeeds getRandomSeeds() {
+        return randomSeeds;
+    }
+
+    public void setRandomSeeds(RandomSeeds randomSeeds) {
+        this.randomSeeds = randomSeeds;
     }
 
     public List<TaskDataGroupDTO> getDataGroups() {

@@ -25,6 +25,14 @@ public interface IDdataService {
 
     void uploadFiles(List<MultipartFile> files, String experimentId);
 
+    void syncSimulationResultFiles(
+            String experimentId,
+            List<String> storedFileNames,
+            List<String> sourceFileNames,
+            Integer sampleFrequency,
+            String createBy,
+            String targetCategory);
+
     default void uploadFiles(List<MultipartFile> files, List<String> relativePaths, String experimentId)
     {
         uploadFiles(files, experimentId);

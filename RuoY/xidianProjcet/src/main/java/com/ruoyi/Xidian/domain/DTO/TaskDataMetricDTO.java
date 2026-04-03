@@ -1,48 +1,57 @@
 package com.ruoyi.Xidian.domain.DTO;
 
-import java.math.BigDecimal;
-
 public class TaskDataMetricDTO {
-    private String metricCode;
-    private String metricName;
-    private BigDecimal recommendedValue;
-    private BigDecimal fluctuationRate;
-    private String unit;
+    private String fieldName;
+    private String dataType;
+    private String recommendedValue;
+    private String fluctuationRange;
+    private String description;
     private Integer sortNo;
 
-    public String getMetricCode() {
-        return metricCode;
+    public String getFieldName() {
+        return fieldName;
     }
-    public void setMetricCode(String metricCode) {
-        this.metricCode = metricCode;
+
+    public void setFieldName(String fieldName) {
+        this.fieldName = fieldName;
     }
-    public String getMetricName() {
-        return metricName;
+
+    public String getDataType() {
+        return dataType;
     }
-    public void setMetricName(String metricName) {
-        this.metricName = metricName;
+
+    public void setDataType(String dataType) {
+        this.dataType = dataType;
     }
-    public BigDecimal getRecommendedValue() {
+
+    public String getRecommendedValue() {
         return recommendedValue;
     }
-    public void setRecommendedValue(BigDecimal recommendedValue) {
+
+    public void setRecommendedValue(String recommendedValue) {
         this.recommendedValue = recommendedValue;
     }
-    public BigDecimal getFluctuationRate() {
-        return fluctuationRate;
+
+    public String getFluctuationRange() {
+        return fluctuationRange;
     }
-    public void setFluctuationRate(BigDecimal fluctuationRate) {
-        this.fluctuationRate = fluctuationRate;
+
+    public void setFluctuationRange(String fluctuationRange) {
+        this.fluctuationRange = fluctuationRange;
     }
-    public String getUnit() {
-        return unit;
+
+    public String getDescription() {
+        return description;
     }
-    public void setUnit(String unit) {
-        this.unit = unit;
+
+    public void setDescription(String description) {
+        this.description = description;
     }
+
     public Integer getSortNo() {
         return sortNo;
     }
+
     public void setSortNo(Integer sortNo) {
         this.sortNo = sortNo;
     }

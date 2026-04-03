@@ -7,7 +7,7 @@ import java.util.List;
 
 @Mapper
 public interface TaskDataGroupMapper  {
-    void insertBatch(List<TaskDataGroup> dataGroups);
+    void insert(TaskDataGroup dataGroup);
 
     TaskDataGroup selectById(Long id);
 
@@ -15,5 +15,5 @@ public interface TaskDataGroupMapper  {
 
     List<TaskDataGroup> selectByTaskId(Long taskId);
 
-    void deleteByTaskId(Long id);
+    void deleteByTaskId(Long taskId);
 }

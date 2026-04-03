@@ -1,97 +1,59 @@
 package com.ruoyi.Xidian.domain;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
-import java.util.List;
 
-//每一个数据表
-public class TaskDataGroup {
+public class TaskDataGroup implements Serializable {
+    private static final long serialVersionUID = 1L;
+
     private Long id;
     private Long taskId;
-    private String groupCode;
     private String groupName;
-    private Integer sortNo;
-
-    private String dataName;
+    private String requestId;
     private String outputType;
+    private String outputDirectory;
+    private String dataSourceType;
+    private String sourceFileName;
     private Long startTimeMs;
     private Long endTimeMs;
-    private BigDecimal frequencyHz;//数据帧率
-    private Boolean enabled;
+    private BigDecimal frequencyHz;
+    private Integer targetNum;
     private String status;
-
-    private List<TaskDataMetric> metricList;
-
-    // getter/setter
-    public void setId(Long id) {
-        this.id = id;
-    }
+    private Vector3 startVelocity;
+    private Attitude startAttitude;
+    private RandomSeeds randomSeeds;
+    private TaskDataMetric metric;
 
     public Long getId() {
         return id;
     }
 
-    public void setTaskId(Long taskId) {
-        this.taskId = taskId;
+    public void setId(Long id) {
+        this.id = id;
     }
 
     public Long getTaskId() {
         return taskId;
     }
 
-    public void setGroupCode(String groupCode) {
-        this.groupCode = groupCode;
-    }
-
-    public String getGroupCode() {
-        return groupCode;
-    }
-
-    public void setGroupName(String groupName) {
-        this.groupName = groupName;
+    public void setTaskId(Long taskId) {
+        this.taskId = taskId;
     }
 
     public String getGroupName() {
         return groupName;
     }
 
-    public void setSortNo(Integer sortNo) {
-        this.sortNo = sortNo;
+    public void setGroupName(String groupName) {
+        this.groupName = groupName;
     }
 
-    public Integer getSortNo() {
-        return sortNo;
+    public String getRequestId() {
+        return requestId;
     }
 
-    public void setEnabled(Boolean enabled) {
-        this.enabled = enabled;
-    }
-
-    public Boolean getEnabled() {
-        return enabled;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setMetricList(List<TaskDataMetric> metricList) {
-        this.metricList = metricList;
-    }
-
-    public List<TaskDataMetric> getMetricList() {
-        return metricList;
-    }
-
-    public String getDataName() {
-        return dataName;
-    }
-
-    public void setDataName(String dataName) {
-        this.dataName = dataName;
+    public void setRequestId(String requestId) {
+        this.requestId = requestId;
     }
 
     public String getOutputType() {
@@ -102,27 +64,99 @@ public class TaskDataGroup {
         this.outputType = outputType;
     }
 
-    public void setStartTimeMs(Long startTimeMs) {
-        this.startTimeMs = startTimeMs;
+    public String getOutputDirectory() {
+        return outputDirectory;
+    }
+
+    public void setOutputDirectory(String outputDirectory) {
+        this.outputDirectory = outputDirectory;
+    }
+
+    public String getDataSourceType() {
+        return dataSourceType;
+    }
+
+    public void setDataSourceType(String dataSourceType) {
+        this.dataSourceType = dataSourceType;
+    }
+
+    public String getSourceFileName() {
+        return sourceFileName;
+    }
+
+    public void setSourceFileName(String sourceFileName) {
+        this.sourceFileName = sourceFileName;
     }
 
     public Long getStartTimeMs() {
         return startTimeMs;
     }
 
-    public void setEndTimeMs(Long endTimeMs) {
-        this.endTimeMs = endTimeMs;
+    public void setStartTimeMs(Long startTimeMs) {
+        this.startTimeMs = startTimeMs;
     }
 
     public Long getEndTimeMs() {
         return endTimeMs;
     }
 
-    public void setFrequencyHz(BigDecimal frequencyHz) {
-        this.frequencyHz = frequencyHz;
+    public void setEndTimeMs(Long endTimeMs) {
+        this.endTimeMs = endTimeMs;
     }
 
     public BigDecimal getFrequencyHz() {
         return frequencyHz;
+    }
+
+    public void setFrequencyHz(BigDecimal frequencyHz) {
+        this.frequencyHz = frequencyHz;
+    }
+
+    public Integer getTargetNum() {
+        return targetNum;
+    }
+
+    public void setTargetNum(Integer targetNum) {
+        this.targetNum = targetNum;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public Vector3 getStartVelocity() {
+        return startVelocity;
+    }
+
+    public void setStartVelocity(Vector3 startVelocity) {
+        this.startVelocity = startVelocity;
+    }
+
+    public Attitude getStartAttitude() {
+        return startAttitude;
+    }
+
+    public void setStartAttitude(Attitude startAttitude) {
+        this.startAttitude = startAttitude;
+    }
+
+    public RandomSeeds getRandomSeeds() {
+        return randomSeeds;
+    }
+
+    public void setRandomSeeds(RandomSeeds randomSeeds) {
+        this.randomSeeds = randomSeeds;
+    }
+
+    public TaskDataMetric getMetric() {
+        return metric;
+    }
+
+    public void setMetric(TaskDataMetric metric) {
+        this.metric = metric;
     }
 }

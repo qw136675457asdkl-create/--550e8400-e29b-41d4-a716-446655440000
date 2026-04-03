@@ -49,7 +49,7 @@ public class DExperimentInfoController extends BaseController
     @Autowired
     private IDdataService ddataService;
 
-    @PreAuthorize("@ss.hasPermi('data:info:list')")
+    //@PreAuthorize("@ss.hasPermi('data:info:list')")
     @GetMapping("/tree")
     public AjaxResult tree(TreeTable treeTable)
     {
@@ -68,7 +68,7 @@ public class DExperimentInfoController extends BaseController
         }
     }
 
-    @PreAuthorize("@ss.hasPermi('data:info:query')")
+    //@PreAuthorize("@ss.hasPermi('data:info:query')")
     @GetMapping(value = {"/", "/{infoId}"})
     public AjaxResult getInfo(@PathVariable(value = "infoId", required = false) String infoId, @RequestParam String type)
     {
@@ -155,7 +155,6 @@ public class DExperimentInfoController extends BaseController
             try
             {
                 ajax.put(AjaxResult.DATA_TAG, dExperimentInfoService.insertDExperimentInfo(dExperimentInfo));
-                ddataService.uploadFiles(files, dExperimentInfo.getExperimentId());
                 //将文件上传到服务器
                 ddataService.uploadFiles(files, dExperimentInfo.getExperimentId());
             }

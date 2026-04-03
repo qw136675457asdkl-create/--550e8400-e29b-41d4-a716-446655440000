@@ -68,5 +68,7 @@ public interface IDExperimentInfoService
 
     String getExperimentPath(String experimentId);
 
+    String getExperimentRelativePath(String experimentId);
+
     List<TreeTableVo> selectExperimentInfoTree(TreeTable treeTable);
 }

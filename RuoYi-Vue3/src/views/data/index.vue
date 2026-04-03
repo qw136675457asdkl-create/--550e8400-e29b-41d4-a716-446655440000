@@ -1,4 +1,4 @@
-﻿<template>
+﻿﻿<template>
     <div class="app-container data-workspace-page">
         <transition name="tree-float-panel">
             <aside v-show="treePanelOpen" class="tree-float-panel" :style="treePanelStyle" @click.stop>
