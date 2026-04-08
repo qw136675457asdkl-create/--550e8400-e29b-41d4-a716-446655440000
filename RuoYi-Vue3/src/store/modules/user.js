@@ -3,7 +3,8 @@ import { ElMessageBox, } from 'element-plus'
 import { login, logout, getInfo } from '@/api/login'
 import { getToken, setToken, removeToken } from '@/utils/auth'
 import { startHeartbeat, stopHeartbeat } from '@/utils/heartbeat'
-import { isHttp, isEmpty } from "@/utils/validate"
+import { isEmpty } from "@/utils/validate"
+import { resolveResourceUrl } from "@/utils/ruoyi"
 import defAva from '@/assets/images/profile.jpg'
 
 const DEFAULT_PASSWORD_VALIDATE_DAYS = 90
@@ -79,9 +80,7 @@ const useUserStore = defineStore(
           getInfo().then(res => {
             const user = res.user
             let avatar = user.avatar || ""
-            if (!isHttp(avatar)) {
-              avatar = (isEmpty(avatar)) ? defAva : import.meta.env.VITE_APP_BASE_API + avatar
-            }
+            avatar = isEmpty(avatar) ? defAva : resolveResourceUrl(avatar)
             if (res.roles && res.roles.length > 0) { // 验证返回的roles是否是一个非空数组
               this.roles = res.roles
               this.permissions = res.permissions

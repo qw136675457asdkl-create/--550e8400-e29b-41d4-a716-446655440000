@@ -67,8 +67,8 @@ spring:
   rabbitmq:
     host: 127.0.0.1
     port: 5672
-    username: guest
-    password: guest
+    username: admin
+    password: YourStrongPassword
       # 强烈建议开启手动确认，保证消息不丢失
     listener:
       simple:

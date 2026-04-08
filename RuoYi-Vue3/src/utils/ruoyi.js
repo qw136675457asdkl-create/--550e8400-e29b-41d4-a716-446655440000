@@ -4,6 +4,8 @@
  */
 
 // 日期格式化
+import { isExternal } from "@/utils/validate"
+
 export function parseTime(time, pattern) {
   if (arguments.length === 0 || !time) {
     return null
@@ -130,6 +132,21 @@ export function parseStrEmpty(str) {
     return ""
   }
   return str
+}
+
+export function resolveResourceUrl(url) {
+  if (!url) {
+    return url
+  }
+  if (isExternal(url) || url.startsWith("data:") || url.startsWith("blob:")) {
+    return url
+  }
+  const normalizedUrl = url.startsWith("/") ? url : `/${url}`
+  const baseApi = (import.meta.env.VITE_APP_BASE_API || "").replace(/\/$/, "")
+  if (import.meta.env.DEV && baseApi) {
+    return `${baseApi}${normalizedUrl}`
+  }
+  return normalizedUrl
 }
 
 // 数据合并

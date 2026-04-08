@@ -39,7 +39,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
@@ -128,7 +127,7 @@ public class DdataServiceImpl implements IDdataService
         String normalizedPath = normalizeExperimentUploadPath(relativePath);
         Path projectRoot = buildProjectRootPath(projectInfo);
         Path experimentRoot = buildExperimentRootPath(projectInfo, experimentInfo);
-        String storagePath = buildUniqueExperimentStoragePath(experimentRoot, normalizedPath);
+        String storagePath = buildExperimentStoragePath(normalizedPath);
         Path targetPath = resolveAbsoluteDataPath(experimentRoot, storagePath);
 
         try (PathLockManager.LockHandle ignored = pathLockManager.lock(
@@ -147,7 +146,7 @@ public class DdataServiceImpl implements IDdataService
             DdataInfo oldInfo = ddataMapper.selectSameNameFile(experimentInfo.getExperimentId(), storagePath);
             if (oldInfo != null)
             {
-                mergeExistingSimulationDataInfo(ddataInfo, oldInfo);
+                mergeExistingDataInfo(ddataInfo, oldInfo);
                 redisCache.deleteObject(CacheConstants.DATA_INFO_KEY + oldInfo.getId());
                 ddataMapper.updateDdataInfo(ddataInfo);
                 return;
@@ -179,7 +178,7 @@ public class DdataServiceImpl implements IDdataService
         return ddataInfo;
     }
 
-    private String buildUniqueExperimentStoragePath(Path experimentRoot, String relativePath)
+    private String buildExperimentStoragePath(String relativePath)
     {
         return normalizeDataFilePath(relativePath);
     }
@@ -480,7 +479,7 @@ public class DdataServiceImpl implements IDdataService
                 DdataInfo oldInfo = ddataMapper.selectSameNameFile(experimentId, dataFilePath);
                 if (oldInfo != null)
                 {
-                    mergeExistingSimulationDataInfo(ddataInfo, oldInfo);
+                    mergeExistingDataInfo(ddataInfo, oldInfo);
                     redisCache.deleteObject(CacheConstants.DATA_INFO_KEY + oldInfo.getId());
                     ddataMapper.updateDdataInfo(ddataInfo);
                     index++;
@@ -793,8 +792,7 @@ public class DdataServiceImpl implements IDdataService
         String normalizedOriginalPath = normalizeDataFilePath("/" + originalFilename);
         String baseName = extractBaseName(normalizedOriginalPath);
         String suffix = extractSuffix(normalizedOriginalPath);
-        String uniqueBaseName = baseName + "_" + UUID.randomUUID().toString().replace("-", "");
-        return buildDataFilePath("/", uniqueBaseName, suffix);
+        return buildDataFilePath("/", baseName ,suffix);
     }
 
     private DdataInfo buildSimulationResultDataInfo(
@@ -823,7 +821,7 @@ public class DdataServiceImpl implements IDdataService
         return ddataInfo;
     }
 
-    private void mergeExistingSimulationDataInfo(DdataInfo ddataInfo, DdataInfo oldInfo)
+    private void mergeExistingDataInfo(DdataInfo ddataInfo, DdataInfo oldInfo)
     {
         ddataInfo.setId(oldInfo.getId());
         if (ddataInfo.getTargetId() == null)

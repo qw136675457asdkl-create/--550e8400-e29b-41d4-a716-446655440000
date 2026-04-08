@@ -157,7 +157,7 @@ public class FileUploadUtils
 
     public static final File getAbsoluteFile(String uploadDir, String fileName) throws IOException
     {
-        File desc = new File(defaultBaseDir+uploadDir + File.separator + fileName);
+        File desc = new File(resolveUploadDir(uploadDir), fileName);
 
         if (!desc.exists())
         {
@@ -171,9 +171,48 @@ public class FileUploadUtils
 
     public static final String getPathFileName(String uploadDir, String fileName) throws IOException
     {
-        int dirLastIndex = RuoYiConfig.getProfile().length() + 1;
-        String currentDir = StringUtils.substring(uploadDir, dirLastIndex);
-        return Constants.RESOURCE_PREFIX + "/" + currentDir + "/" + fileName;
+        String currentDir = resolveResourceDir(uploadDir);
+        return StringUtils.format("{}{}/{}", Constants.RESOURCE_PREFIX, currentDir, fileName)
+                .replace("\\", "/")
+                .replaceAll("/{2,}", "/");
+    }
+
+    private static String resolveUploadDir(String uploadDir)
+    {
+        if (isProfilePath(uploadDir))
+        {
+            return uploadDir;
+        }
+        return new File(defaultBaseDir, normalizeRelativeDir(uploadDir)).getPath();
+    }
+
+    private static String resolveResourceDir(String uploadDir)
+    {
+        String currentDir = normalizeSlashes(uploadDir);
+        String profileDir = normalizeSlashes(RuoYiConfig.getProfile());
+
+        if (currentDir.startsWith(profileDir))
+        {
+            currentDir = currentDir.substring(profileDir.length());
+        }
+
+        currentDir = currentDir.replaceFirst("^/+", "").replaceFirst("/+$", "");
+        return StringUtils.isEmpty(currentDir) ? "" : "/" + currentDir;
+    }
+
+    private static boolean isProfilePath(String uploadDir)
+    {
+        return normalizeSlashes(uploadDir).startsWith(normalizeSlashes(RuoYiConfig.getProfile()));
+    }
+
+    private static String normalizeRelativeDir(String uploadDir)
+    {
+        return normalizeSlashes(uploadDir).replaceFirst("^/+", "").replaceFirst("/+$", "");
+    }
+
+    private static String normalizeSlashes(String path)
+    {
+        return path == null ? "" : path.replace("\\", "/");
     }
 
     /**
