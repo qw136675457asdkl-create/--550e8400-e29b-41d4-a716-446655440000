@@ -898,6 +898,7 @@
 
         <!-- 业务数据详情 (文件预览) 对话框 -->
         <el-dialog
+            v-if="false"
             ref="detailDialogRef"
             v-model="detailVisible"
             :width="detailDialogWidth"
@@ -1013,6 +1014,137 @@
                 </div>
             </template>
         </el-dialog>
+
+        <teleport to="body">
+            <div v-if="detailVisible" class="data-detail-window-layer" :class="{ 'is-minimized': detailDialogMinimized }">
+                <div v-if="!detailDialogMinimized" class="data-detail-window-overlay"></div>
+                <section
+                    class="data-detail-window"
+                    :class="{
+                        'is-maximized': detailDialogFullscreen,
+                        'is-minimized': detailDialogMinimized,
+                        'is-dragging': isDetailDialogDragging
+                    }"
+                    :style="detailWindowStyle"
+                >
+                    <header
+                        class="data-detail-window__header"
+                        :class="{ 'is-draggable': isDetailDialogNormal }"
+                        @mousedown="startDetailDialogDrag"
+                        @dblclick="toggleDetailDialogFullscreen"
+                        @click="handleDetailWindowHeaderClick"
+                    >
+                        <div class="data-detail-window__title-group">
+                            <div class="data-detail-window__title">{{ detailTitle }}</div>
+                            <div class="data-detail-window__subtitle">
+                                {{ detailFile?.name || detailFile?.dataFilePath || '业务数据详情预览' }}
+                            </div>
+                        </div>
+                        <div class="data-detail-window__controls" @mousedown.stop>
+                            <button
+                                type="button"
+                                class="data-detail-window__control data-detail-window__control--minimize"
+                                :aria-label="detailDialogMinimized ? '还原' : '最小化'"
+                                @click.stop="toggleDetailDialogMinimize"
+                            >
+                                <span
+                                    class="data-detail-window__control-icon"
+                                    :class="detailDialogMinimized ? 'data-detail-window__control-icon--restore' : 'data-detail-window__control-icon--minimize'"
+                                ></span>
+                            </button>
+                            <button
+                                type="button"
+                                class="data-detail-window__control"
+                                :aria-label="detailDialogFullscreen ? '还原' : '最大化'"
+                                @click.stop="toggleDetailDialogFullscreen"
+                            >
+                                <span
+                                    class="data-detail-window__control-icon"
+                                    :class="detailDialogFullscreen ? 'data-detail-window__control-icon--restore' : 'data-detail-window__control-icon--maximize'"
+                                ></span>
+                            </button>
+                            <button
+                                type="button"
+                                class="data-detail-window__control data-detail-window__control--close"
+                                aria-label="关闭"
+                                @click.stop="closeDetailPreviewWindow"
+                            >
+                                <span class="data-detail-window__control-icon data-detail-window__control-icon--close"></span>
+                            </button>
+                        </div>
+                    </header>
+
+                    <div v-show="!detailDialogMinimized" class="data-detail-window__body">
+                        <div class="data-detail-window__content">
+                            <div v-if="detailFile" class="data-detail-window__content-inner">
+                                <div v-if="isDetailTabularFile" class="detail-preview-pane">
+                                    <div v-loading="detailPreviewLoading" class="detail-preview-pane__body">
+                                        <el-table v-if="detailTableRows.length > 0" :data="detailTableRows" border stripe :height="detailPreviewContentHeight">
+                                            <el-table-column
+                                                v-for="header in detailTableColumns"
+                                                :key="header"
+                                                :prop="header"
+                                                :label="header"
+                                                show-overflow-tooltip
+                                            />
+                                        </el-table>
+                                        <el-empty v-else :description="detailPreviewMessage || '暂无预览数据'" />
+                                    </div>
+                                    <pagination
+                                        v-show="detailPreviewTotal > 0"
+                                        class="detail-preview-pane__pagination"
+                                        :total="detailPreviewTotal"
+                                        v-model:page="detailPreviewPageNum"
+                                        v-model:limit="detailPreviewPageSize"
+                                        @pagination="loadDetailTablePreview"
+                                    />
+                                </div>
+                                <div v-else-if="isDetailTextFile" class="detail-preview-pane">
+                                    <div v-loading="detailPreviewLoading" class="detail-preview-pane__body">
+                                        <div v-if="detailTextLines.length > 0" class="detail-text-preview" :style="{ height: detailPreviewContentHeight }">
+                                            <div
+                                                v-for="(line, index) in detailTextLines"
+                                                :key="`${detailPreviewPageNum}-${index}`"
+                                                class="detail-text-preview__line"
+                                            >
+                                                <span class="detail-text-preview__line-number">{{ detailPreviewLineStart + index + 1 }}</span>
+                                                <pre class="detail-text-preview__line-content">{{ line }}</pre>
+                                            </div>
+                                        </div>
+                                        <el-empty v-else :description="detailPreviewMessage || '暂无预览数据'" />
+                                    </div>
+                                    <pagination
+                                        v-show="detailPreviewTotal > 0"
+                                        class="detail-preview-pane__pagination"
+                                        :total="detailPreviewTotal"
+                                        v-model:page="detailPreviewPageNum"
+                                        v-model:limit="detailPreviewPageSize"
+                                        @pagination="loadDetailTablePreview"
+                                    />
+                                </div>
+                                <div v-else-if="isDetailPdfFile" class="detail-pdf-preview">
+                                    <div v-loading="detailPreviewLoading" class="detail-pdf-preview__container" :style="{ height: detailPreviewContentHeight }">
+                                        <iframe v-if="detailPdfUrl" :src="detailPdfUrl" class="detail-pdf-preview__frame" title="PDF预览" />
+                                        <el-empty v-else :description="detailPreviewMessage || '暂无 PDF 预览内容'" />
+                                    </div>
+                                </div>
+                                <div v-else-if="isDetailBinaryFile" class="detail-preview__unsupported">
+                                    <el-empty :description="detailPreviewMessage || '暂不支持预览二进制文件，请下载后查看'" />
+                                </div>
+                                <div v-else class="detail-preview__unsupported">
+                                    <el-empty :description="detailPreviewMessage || '暂不支持在线预览该文件'" />
+                                </div>
+                            </div>
+                            <el-empty v-else class="data-detail-window__empty" description="暂无文件信息或路径无效" />
+                        </div>
+                        <footer class="data-detail-window__footer">
+                            <el-button type="primary" @click="handleDownloadDetailFile(detailFile)" v-if="detailFile" v-hasPermi="['dataInfo:info:download']">下 载</el-button>
+                            <el-button @click="closeDetailPreviewWindow">关 闭</el-button>
+                        </footer>
+                    </div>
+                </section>
+            </div>
+        </teleport>
     </div>
 </template>
 <script setup name="Business">
@@ -1087,8 +1219,9 @@ const detailDialogRef = ref(null)
 const detailVisible = ref(false)
 const detailFile = ref(null)
 const detailTitle = ref("文件预览")
-const detailDialogMinimized = ref(false)
-const detailDialogFullscreen = ref(false)
+const detailWindowState = ref('normal')
+const detailWindowStateBeforeMinimize = ref('normal')
+const isDetailDialogDragging = ref(false)
 const detailPreviewLoading = ref(false)
 const detailPreviewPageNum = ref(1)
 const detailPreviewPageSize = ref(200)
@@ -1101,6 +1234,28 @@ const movePathNodeMap = ref({})
 const selectedMovePathNodeId = ref(null)
 const selectedMovePathNode = ref(null)
 const currentFileSuffix = ref('')
+const detailViewport = reactive({
+  width: 0,
+  height: 0
+})
+const detailWindowRect = reactive({
+  left: 0,
+  top: 0,
+  width: 0,
+  height: 0
+})
+const lastNormalDetailWindowRect = reactive({
+  left: 0,
+  top: 0,
+  width: 0,
+  height: 0
+})
+const detailDragState = reactive({
+  startX: 0,
+  startY: 0,
+  originLeft: 0,
+  originTop: 0
+})
 
 const createInfoForm = () => ({
   id: null,
@@ -1887,9 +2042,49 @@ const treeExperimentCount = computed(() => {
 const selectedCount = computed(() => ids.value.length)
 const realDataCount = computed(() => businessList.value.filter(item => item?.isSimulation === true).length)
 const simulationDataCount = computed(() => businessList.value.filter(item => item?.isSimulation === false).length)
+const detailDialogMinimized = computed(() => detailWindowState.value === 'minimized')
+const detailDialogFullscreen = computed(() => detailWindowState.value === 'maximized')
+const isDetailDialogNormal = computed(() => detailWindowState.value === 'normal')
 const detailDialogWidth = computed(() => detailDialogMinimized.value ? '460px' : 'min(1440px, calc(100vw - 16px))')
 const detailDialogTop = computed(() => detailDialogFullscreen.value ? '0' : '4vh')
-const detailPreviewContentHeight = computed(() => detailDialogFullscreen.value ? 'calc(100vh - 232px)' : '62vh')
+const detailWindowStyle = computed(() => {
+  const viewportWidth = detailViewport.width || 1440
+  const viewportHeight = detailViewport.height || 900
+
+  if (detailDialogMinimized.value) {
+    const width = Math.min(420, Math.max(viewportWidth - 24, 300))
+    return {
+      left: `${Math.max(viewportWidth - width - 12, 12)}px`,
+      top: `${Math.max(viewportHeight - 68, 12)}px`,
+      width: `${width}px`,
+      height: '56px'
+    }
+  }
+
+  if (detailDialogFullscreen.value) {
+    return {
+      left: '12px',
+      top: '12px',
+      width: `${Math.max(viewportWidth - 24, 320)}px`,
+      height: `${Math.max(viewportHeight - 24, 240)}px`
+    }
+  }
+
+  return {
+    left: `${detailWindowRect.left}px`,
+    top: `${detailWindowRect.top}px`,
+    width: `${detailWindowRect.width}px`,
+    height: `${detailWindowRect.height}px`
+  }
+})
+const detailPreviewContentHeight = computed(() => {
+  const viewportHeight = detailViewport.height || window.innerHeight || 900
+  const windowHeight = detailDialogFullscreen.value
+    ? Math.max(viewportHeight - 24, 240)
+    : detailWindowRect.height || Math.round(viewportHeight * 0.82)
+  const paginationHeight = (isDetailTabularFile.value || isDetailTextFile.value) && detailPreviewTotal.value > 0 ? 56 : 0
+  return `${Math.max(windowHeight - 56 - 76 - 40 - paginationHeight, 180)}px`
+})
 const previewDataFilePath = computed(() => {
   const originalPath = form.value?.dataFilePath
   if (!originalPath) return ''
@@ -1919,6 +2114,143 @@ const detailTextLines = computed(() =>
   })
 )
 const detailPreviewLineStart = computed(() => (detailPreviewPageNum.value - 1) * detailPreviewPageSize.value)
+
+function clampDetailValue(value, min, max) {
+  return Math.min(Math.max(value, min), max)
+}
+
+function clampDetailMetric(value, preferredMin, max) {
+  const safeMax = Math.max(max, 280)
+  const safeMin = Math.min(preferredMin, safeMax)
+  return Math.min(Math.max(value, safeMin), safeMax)
+}
+
+function assignDetailRect(target, source) {
+  target.left = source.left
+  target.top = source.top
+  target.width = source.width
+  target.height = source.height
+}
+
+function normalizeDetailWindowRect(sourceRect) {
+  const viewportWidth = detailViewport.width || window.innerWidth || 1440
+  const viewportHeight = detailViewport.height || window.innerHeight || 900
+  const width = clampDetailMetric(Number(sourceRect.width) || Math.round(viewportWidth * 0.84), 1120, Math.max(viewportWidth - 32, 360))
+  const height = clampDetailMetric(Number(sourceRect.height) || Math.round(viewportHeight * 0.82), 720, Math.max(viewportHeight - 32, 320))
+  const maxLeft = Math.max(8, viewportWidth - width - 8)
+  const maxTop = Math.max(8, viewportHeight - height - 8)
+
+  return {
+    left: clampDetailValue(Number(sourceRect.left) || 0, 8, maxLeft),
+    top: clampDetailValue(Number(sourceRect.top) || 0, 8, maxTop),
+    width,
+    height
+  }
+}
+
+function createDefaultDetailWindowRect() {
+  const viewportWidth = detailViewport.width || window.innerWidth || 1440
+  const viewportHeight = detailViewport.height || window.innerHeight || 900
+  const width = clampDetailMetric(Math.round(viewportWidth * 0.84), 1160, Math.max(viewportWidth - 48, 380))
+  const height = clampDetailMetric(Math.round(viewportHeight * 0.82), 760, Math.max(viewportHeight - 48, 360))
+
+  return normalizeDetailWindowRect({
+    left: Math.round((viewportWidth - width) / 2),
+    top: Math.max(20, Math.round((viewportHeight - height) / 2)),
+    width,
+    height
+  })
+}
+
+function syncDetailDialogRect() {
+  assignDetailRect(lastNormalDetailWindowRect, detailWindowRect)
+}
+
+function updateDetailDialogViewport() {
+  detailViewport.width = window.innerWidth
+  detailViewport.height = window.innerHeight
+
+  if (detailVisible.value && isDetailDialogNormal.value) {
+    const nextRect = normalizeDetailWindowRect(detailWindowRect)
+    assignDetailRect(detailWindowRect, nextRect)
+    syncDetailDialogRect()
+  }
+}
+
+function initializeDetailDialogWindow() {
+  updateDetailDialogViewport()
+  const rect = createDefaultDetailWindowRect()
+  assignDetailRect(detailWindowRect, rect)
+  syncDetailDialogRect()
+  detailWindowState.value = 'normal'
+  detailWindowStateBeforeMinimize.value = 'normal'
+}
+
+function handleDetailDialogDragMove(event) {
+  if (!isDetailDialogDragging.value) {
+    return
+  }
+
+  const nextRect = normalizeDetailWindowRect({
+    left: detailDragState.originLeft + event.clientX - detailDragState.startX,
+    top: detailDragState.originTop + event.clientY - detailDragState.startY,
+    width: detailWindowRect.width,
+    height: detailWindowRect.height
+  })
+
+  detailWindowRect.left = nextRect.left
+  detailWindowRect.top = nextRect.top
+  syncDetailDialogRect()
+}
+
+function stopDetailDialogDrag() {
+  if (!isDetailDialogDragging.value) {
+    return
+  }
+
+  isDetailDialogDragging.value = false
+  document.removeEventListener('mousemove', handleDetailDialogDragMove)
+  document.removeEventListener('mouseup', stopDetailDialogDrag)
+  document.body.style.userSelect = ''
+}
+
+function startDetailDialogDrag(event) {
+  if (!detailVisible.value || !isDetailDialogNormal.value || event.button !== 0) {
+    return
+  }
+
+  isDetailDialogDragging.value = true
+  detailDragState.startX = event.clientX
+  detailDragState.startY = event.clientY
+  detailDragState.originLeft = detailWindowRect.left
+  detailDragState.originTop = detailWindowRect.top
+  document.body.style.userSelect = 'none'
+  document.addEventListener('mousemove', handleDetailDialogDragMove)
+  document.addEventListener('mouseup', stopDetailDialogDrag)
+  event.preventDefault()
+}
+
+function restoreDetailDialogWindow() {
+  stopDetailDialogDrag()
+  detailWindowState.value = 'normal'
+  const rectSource = lastNormalDetailWindowRect.width ? lastNormalDetailWindowRect : createDefaultDetailWindowRect()
+  const rect = normalizeDetailWindowRect(rectSource)
+  assignDetailRect(detailWindowRect, rect)
+  syncDetailDialogRect()
+}
+
+function handleDetailWindowHeaderClick() {
+  if (!detailDialogMinimized.value) {
+    return
+  }
+
+  if (detailWindowStateBeforeMinimize.value === 'maximized') {
+    detailWindowState.value = 'maximized'
+    return
+  }
+
+  restoreDetailDialogWindow()
+}
 
 function getPreviewFileName(file) {
   if (!file) return ''
@@ -1973,8 +2305,12 @@ function resetDetailPreviewState() {
 }
 
 function resetDetailDialogWindowState() {
-  detailDialogMinimized.value = false
-  detailDialogFullscreen.value = false
+  stopDetailDialogDrag()
+  detailWindowState.value = 'normal'
+  detailWindowStateBeforeMinimize.value = 'normal'
+  const rect = createDefaultDetailWindowRect()
+  assignDetailRect(detailWindowRect, rect)
+  syncDetailDialogRect()
 }
 
 function handleDetailDialogClosed() {
@@ -1986,17 +2322,37 @@ function handleDetailDialogClosed() {
 
 function toggleDetailDialogMinimize() {
   if (detailDialogMinimized.value) {
-    detailDialogMinimized.value = false
+    if (detailWindowStateBeforeMinimize.value === 'maximized') {
+      detailWindowState.value = 'maximized'
+      return
+    }
+    restoreDetailDialogWindow()
     return
   }
-  detailDialogFullscreen.value = false
-  detailDialogMinimized.value = true
+  stopDetailDialogDrag()
+  if (isDetailDialogNormal.value) {
+    syncDetailDialogRect()
+  }
+  detailWindowStateBeforeMinimize.value = detailDialogFullscreen.value ? 'maximized' : 'normal'
+  detailWindowState.value = 'minimized'
 }
 
 function toggleDetailDialogFullscreen() {
-  const nextFullscreen = !detailDialogFullscreen.value
-  detailDialogMinimized.value = false
-  detailDialogFullscreen.value = nextFullscreen
+  stopDetailDialogDrag()
+  if (detailDialogFullscreen.value) {
+    restoreDetailDialogWindow()
+    return
+  }
+
+  if (isDetailDialogNormal.value) {
+    syncDetailDialogRect()
+  }
+  detailWindowState.value = 'maximized'
+}
+
+function closeDetailPreviewWindow() {
+  stopDetailDialogDrag()
+  detailVisible.value = false
 }
 
 async function loadDetailTablePreview() {
@@ -2186,6 +2542,14 @@ watch(
     syncTreeEditTargetType()
   }
 )
+
+watch(detailVisible, visible => {
+  if (visible) {
+    return
+  }
+
+  handleDetailDialogClosed()
+})
 
 function handleNodeClick(data) {
     if(data.type==="experiment"){
@@ -2390,10 +2754,18 @@ function getList(){
       loading.value = false;
     });
 }
-onMounted(()=>{
+onMounted(() => {
+    updateDetailDialogViewport()
+    window.addEventListener('resize', updateDetailDialogViewport)
     getList()
     getTreeData()
     getProjects()
+})
+
+onBeforeUnmount(() => {
+    stopDetailDialogDrag()
+    revokeDetailPdfUrl()
+    window.removeEventListener('resize', updateDetailDialogViewport)
 })
 
 </script>
@@ -3404,6 +3776,238 @@ onMounted(()=>{
   background: #fafafa;
 }
 
+.data-detail-window-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  pointer-events: none;
+}
+
+.data-detail-window-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.24);
+  backdrop-filter: blur(4px);
+  pointer-events: auto;
+}
+
+.data-detail-window {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  min-width: 300px;
+  min-height: 56px;
+  border: 1px solid rgba(226, 232, 240, 0.96);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 26px 60px rgba(15, 23, 42, 0.24);
+  overflow: hidden;
+  pointer-events: auto;
+  transition: top 0.2s ease, left 0.2s ease, width 0.2s ease, height 0.2s ease, box-shadow 0.2s ease;
+}
+
+.data-detail-window.is-dragging {
+  transition: none;
+  box-shadow: 0 30px 72px rgba(15, 23, 42, 0.3);
+}
+
+.data-detail-window.is-minimized {
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.22);
+}
+
+.data-detail-window.is-minimized .data-detail-window__header {
+  border-bottom: none;
+}
+
+.data-detail-window.is-minimized .data-detail-window__subtitle {
+  display: none;
+}
+
+.data-detail-window__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 56px;
+  padding-left: 18px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.96);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  user-select: none;
+}
+
+.data-detail-window__header.is-draggable {
+  cursor: move;
+}
+
+.data-detail-window__title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.data-detail-window__title {
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.data-detail-window__subtitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.data-detail-window__controls {
+  display: flex;
+  align-items: stretch;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.data-detail-window__control {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  min-width: 46px;
+  height: 56px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.data-detail-window__control:hover {
+  background: rgba(148, 163, 184, 0.16);
+  color: #0f172a;
+}
+
+.data-detail-window__control--close:hover {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.data-detail-window__control-icon {
+  position: relative;
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+
+.data-detail-window__control-icon--minimize::before {
+  content: '';
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  bottom: 2px;
+  height: 1.8px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.data-detail-window__control-icon--maximize {
+  box-sizing: border-box;
+  border: 1.6px solid currentColor;
+  border-radius: 2px;
+}
+
+.data-detail-window__control-icon--restore::before,
+.data-detail-window__control-icon--restore::after {
+  content: '';
+  position: absolute;
+  box-sizing: border-box;
+  width: 8px;
+  height: 8px;
+  border: 1.6px solid currentColor;
+  border-radius: 2px;
+  background: #ffffff;
+}
+
+.data-detail-window__control-icon--restore::before {
+  top: 0;
+  right: 0;
+}
+
+.data-detail-window__control-icon--restore::after {
+  left: 0;
+  bottom: 0;
+}
+
+.data-detail-window__control-icon--close::before,
+.data-detail-window__control-icon--close::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 0;
+  width: 12px;
+  height: 1.8px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.data-detail-window__control-icon--close::before {
+  transform: rotate(45deg);
+}
+
+.data-detail-window__control-icon--close::after {
+  transform: rotate(-45deg);
+}
+
+.data-detail-window__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  background: #ffffff;
+}
+
+.data-detail-window__content {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 18px 20px 12px;
+  overflow: hidden;
+}
+
+.data-detail-window__content-inner,
+.detail-preview-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.detail-preview-pane__body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.detail-preview-pane__pagination {
+  padding-top: 12px;
+}
+
+.data-detail-window__empty {
+  height: 100%;
+}
+
+.data-detail-window__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 12px 20px 20px;
+  border-top: 1px solid rgba(226, 232, 240, 0.92);
+  background: rgba(255, 255, 255, 0.98);
+}
+
 .experiment-upload__alert {
   margin-bottom: 14px;
 }
@@ -3818,6 +4422,33 @@ onMounted(()=>{
   .drawer-form-shell__header,
   .drawer-form-shell__body,
   .drawer-form-shell__footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .data-detail-window {
+    min-width: 0;
+  }
+
+  .data-detail-window__header {
+    padding-left: 14px;
+  }
+
+  .data-detail-window__title-group {
+    gap: 8px;
+  }
+
+  .data-detail-window__subtitle {
+    display: none;
+  }
+
+  .data-detail-window__control {
+    width: 42px;
+    min-width: 42px;
+  }
+
+  .data-detail-window__content,
+  .data-detail-window__footer {
     padding-left: 16px;
     padding-right: 16px;
   }

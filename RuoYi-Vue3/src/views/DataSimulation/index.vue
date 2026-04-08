@@ -63,8 +63,8 @@
           <div class="toolbar__left">
             <el-button type="primary" icon="Plus" @click="openCreateDialog" v-hasPermi="['data:simulation:insert']">新增仿真任务</el-button>
             <el-button
+              class="toolbar-delete-btn"
               type="danger"
-              plain
               icon="Delete"
               v-hasPermi="['data:simulation:delete']"
               :disabled="deleteDisabled"
@@ -72,7 +72,6 @@
             >
               删除
             </el-button>
-            <el-button type="warning" plain icon="Refresh" @click="getList">刷新</el-button>
           </div>
           <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" />
         </div>
@@ -252,15 +251,25 @@
               <el-tab-pane
                 v-for="tab in simulationTabs"
                 :key="tab.code"
-                :label="tab.label"
                 :name="tab.code"
-              />
+              >
+                <template #label>
+                  <div
+                    class="simulation-tab-label"
+                    :class="{ 'is-enabled': simulationForm.tabs[tab.code]?.enabled }"
+                  >
+                    <span class="simulation-tab-label__dot"></span>
+                    <span class="simulation-tab-label__text">{{ tab.label }}</span>
+                  </div>
+                </template>
+              </el-tab-pane>
             </el-tabs>
 
             <div class="tab-panel">
               <div class="tab-panel__header">
                 <div class="tab-panel__title">{{ currentSimulationTab.label }}</div>
                 <el-switch
+                  class="tab-panel__switch"
                   v-model="currentSimulationTabState.enabled"
                   active-text="纳入本次任务"
                   inactive-text="暂不生成"
@@ -283,8 +292,13 @@
                 <el-form-item v-if="currentSimulationTab.showDataSource" label="数据模型">
                   <div class="data-source-row">
                     <el-radio-group v-model="currentSimulationTabState.dataSourceType">
-                      <el-radio value="existing">基于已有数据</el-radio>
-                      <el-radio value="simulate">模拟生成</el-radio>
+                      <el-radio
+                        v-for="option in currentSimulationDataSourceOptions"
+                        :key="option.value"
+                        :value="option.value"
+                      >
+                        {{ option.label }}
+                      </el-radio>
                     </el-radio-group>
                     <el-select
                       v-model="currentSimulationTabState.sourceFileName"
@@ -647,6 +661,17 @@ const currentSimulationTab = computed(() => {
 
 const currentSimulationTabState = computed(() => {
   return simulationForm.tabs[activeSimulationTab.value]
+})
+
+const currentSimulationDataSourceOptions = computed(() => {
+  const defaultOptions = [
+    { value: 'existing', label: '基于已有数据' },
+    { value: 'simulate', label: '模拟生成' }
+  ]
+
+  return ['RADAR_TRACK', 'ADS_B'].includes(currentSimulationTab.value.code)
+    ? [...defaultOptions].reverse()
+    : defaultOptions
 })
 
 const currentSimulationMetrics = computed(() => {
@@ -1436,6 +1461,28 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
+.toolbar__left :deep(.toolbar-delete-btn.el-button) {
+  color: #ffffff;
+  background: #f04438;
+  border-color: #f04438;
+  box-shadow: 0 12px 24px rgba(240, 68, 56, 0.2);
+}
+
+.toolbar__left :deep(.toolbar-delete-btn.el-button:hover),
+.toolbar__left :deep(.toolbar-delete-btn.el-button:focus) {
+  color: #ffffff;
+  background: #d92d20;
+  border-color: #d92d20;
+}
+
+.toolbar__left :deep(.toolbar-delete-btn.el-button.is-disabled),
+.toolbar__left :deep(.toolbar-delete-btn.el-button.is-disabled:hover) {
+  color: rgba(255, 255, 255, 0.92);
+  background: #fda29b;
+  border-color: #fda29b;
+  box-shadow: none;
+}
+
 .simulation-panel {
   display: flex;
   flex-direction: column;
@@ -1533,26 +1580,129 @@ onBeforeUnmount(() => {
 }
 
 .simulation-tabs {
-  margin-bottom: 18px;
+  margin-bottom: 0;
+}
+
+.simulation-tabs :deep(.el-tabs__header) {
+  margin: 0;
+  padding: 12px 12px 0;
+  border: 1px solid #d7deea;
+  border-bottom: none;
+  border-radius: 16px 16px 0 0;
+  background: linear-gradient(180deg, #eef3fb 0%, #e4ebf5 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.simulation-tabs :deep(.el-tabs__nav-wrap) {
+  padding: 0;
+}
+
+.simulation-tabs :deep(.el-tabs__nav-wrap::after),
+.simulation-tabs :deep(.el-tabs__active-bar) {
+  display: none;
+}
+
+.simulation-tabs :deep(.el-tabs__nav-prev),
+.simulation-tabs :deep(.el-tabs__nav-next) {
+  width: 30px;
+  color: #64748b;
+}
+
+.simulation-tabs :deep(.el-tabs__nav-prev:hover),
+.simulation-tabs :deep(.el-tabs__nav-next:hover) {
+  color: #1f2937;
+}
+
+.simulation-tabs :deep(.el-tabs__nav) {
+  align-items: flex-end;
+  border: none;
 }
 
 .simulation-tabs :deep(.el-tabs__item) {
-  font-size: 16px;
+  height: auto;
+  padding: 0 4px 0 0;
+  border: none;
+  color: inherit;
+}
+
+.simulation-tabs :deep(.el-tabs__item.is-active) {
+  color: inherit;
+}
+
+.simulation-tabs :deep(.el-tabs__content) {
+  display: none;
+}
+
+.simulation-tab-label {
+  position: relative;
+  top: 1px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 132px;
+  max-width: 190px;
+  padding: 11px 18px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.56);
+  border-bottom: none;
+  border-radius: 14px 14px 0 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.76) 0%, rgba(225, 232, 242, 0.96) 100%);
+  color: #5b6473;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.simulation-tabs :deep(.el-tabs__item:hover .simulation-tab-label) {
+  color: #334155;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(233, 239, 247, 1) 100%);
+}
+
+.simulation-tabs :deep(.el-tabs__item.is-active .simulation-tab-label) {
+  background: linear-gradient(180deg, #ffffff 0%, #ffffff 100%);
+  color: #111827;
+  border-color: #d7deea;
+  box-shadow: 0 -10px 24px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  transform: translateY(1px);
+  z-index: 2;
+}
+
+.simulation-tab-label__dot {
+  position: relative;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #c4ccd8;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.simulation-tab-label.is-enabled .simulation-tab-label__dot {
+  background: #409eff;
+  box-shadow: 0 0 0 4px rgba(64, 158, 255, 0.14);
+}
+
+.simulation-tab-label__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
   font-weight: 700;
 }
 
 .tab-panel {
-  border: 1px solid #dcdfe6;
-  border-radius: 8px;
+  margin-top: -1px;
+  border: 1px solid #d7deea;
+  border-radius: 0 14px 14px 14px;
   padding: 24px 28px 28px;
-  background: #fff;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.05);
 }
 
 .tab-panel__header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  justify-content: flex-start;
+  gap: 18px;
   margin-bottom: 24px;
 }
 
@@ -1560,6 +1710,14 @@ onBeforeUnmount(() => {
   font-size: 18px;
   font-weight: 700;
   color: #303133;
+}
+
+.tab-panel__switch {
+  flex: none;
+}
+
+.tab-panel__switch :deep(.el-switch__label) {
+  white-space: nowrap;
 }
 
 .tab-form {
@@ -1696,6 +1854,35 @@ onBeforeUnmount(() => {
   .toolbar {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .simulation-tab-label {
+    min-width: 118px;
+    max-width: 168px;
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  .simulation-tabs :deep(.el-tabs__header) {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .simulation-tab-label {
+    min-width: 108px;
+    max-width: 144px;
+    padding: 10px 12px 9px;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .simulation-tab-label__text {
+    font-size: 13px;
+  }
+
+  .tab-panel {
+    padding: 20px 16px 22px;
   }
 }
 </style>

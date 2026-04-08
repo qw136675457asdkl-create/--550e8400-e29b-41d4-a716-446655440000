@@ -10,9 +10,9 @@
           体系协同多源识别
           <span>算法分析与优化平台</span>
         </h1>
-        <p class="hero-copy__summary">
-          首页不再只是“欢迎页”，而是把数据接入、仿真推演、模型配置、日志定位与服务态势收拢到同一张工作台上。
-        </p>
+<!--        <p class="hero-copy__summary">-->
+<!--          首页不再只是“欢迎页”，而是把数据接入、仿真推演、模型配置、日志定位与服务态势收拢到同一张工作台上。-->
+<!--        </p>-->
 
         <div class="hero-copy__meta">
           <span class="meta-pill">{{ greetingText }}，{{ userDisplayName }}</span>
@@ -97,7 +97,7 @@
           <div>
             <p class="surface-card__eyebrow">Quick Entry</p>
             <h3 class="surface-card__title">快捷入口</h3>
-            <p class="surface-card__description">把常用的大页面前置到首页，减少来回切换成本。</p>
+<!--            <p class="surface-card__description">把常用的大页面前置到首页，减少来回切换成本。</p>-->
           </div>
         </div>
 
@@ -127,7 +127,7 @@
           <div>
             <p class="surface-card__eyebrow">Algorithm Storyline</p>
             <h3 class="surface-card__title">协同识别主链路</h3>
-            <p class="surface-card__description">首页要解释系统正在做什么，而不只是告诉用户系统“还活着”。</p>
+<!--            <p class="surface-card__description">首页要解释系统正在做什么，而不只是告诉用户系统“还活着”。</p>-->
           </div>
         </div>
 
@@ -152,7 +152,7 @@
           <div>
             <p class="surface-card__eyebrow">Today Focus</p>
             <h3 class="surface-card__title">今日聚焦</h3>
-            <p class="surface-card__description">让首页给出结论、建议和下一步动作，而不是只陈列指标。</p>
+<!--            <p class="surface-card__description">让首页给出结论、建议和下一步动作，而不是只陈列指标。</p>-->
           </div>
         </div>
 
@@ -165,6 +165,7 @@
             <span class="focus-card__eyebrow">{{ item.eyebrow }}</span>
             <strong class="focus-card__title">{{ item.title }}</strong>
             <p class="focus-card__desc">{{ item.description }}</p>
+
           </article>
         </div>
 
