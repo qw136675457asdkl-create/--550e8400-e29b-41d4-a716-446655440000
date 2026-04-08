@@ -362,6 +362,9 @@ public class DdataServiceImpl implements IDdataService
                 {
                     Files.createDirectories(parentPath);
                 }
+                if(ddataMapper.selectSameNameFile(ddataInfo.getExperimentId(),targetDataFilePath) != null){
+                    throw new ServiceException("文件名重复，请重新输入");
+                }
 
                 FileUploadUtils.assertAllowed(file, MimeTypeUtils.DEFAULT_ALLOWED_EXTENSION);
                 file.transferTo(targetPath);
@@ -540,7 +543,7 @@ public class DdataServiceImpl implements IDdataService
                 {
                     throw new ServiceException("源数据文件不存在");
                 }
-                if (Files.exists(newAbsolutePath) && !newAbsolutePath.equals(oldAbsolutePath))
+                if (ddataMapper.selectSameNameFile(ddataInfo.getExperimentId(),targetDataFilePath) != null && !newAbsolutePath.equals(oldAbsolutePath))
                 {
                     throw new ServiceException("目标文件已存在");
                 }

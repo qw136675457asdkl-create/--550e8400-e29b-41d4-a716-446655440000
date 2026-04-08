@@ -18,9 +18,6 @@ public class TaskCreateRequest {
 
     private Coordinate startCoordinate;
     private Coordinate endCoordinate;
-    private Vector3 startVelocity;
-    private Attitude startAttitude;
-    private RandomSeeds randomSeeds;
 
     private List<TaskDataGroupDTO> dataGroups;
 
@@ -87,30 +84,6 @@ public class TaskCreateRequest {
 
     public void setEndCoordinate(Coordinate endCoordinate) {
         this.endCoordinate = endCoordinate;
-    }
-
-    public Vector3 getStartVelocity() {
-        return startVelocity;
-    }
-
-    public void setStartVelocity(Vector3 startVelocity) {
-        this.startVelocity = startVelocity;
-    }
-
-    public Attitude getStartAttitude() {
-        return startAttitude;
-    }
-
-    public void setStartAttitude(Attitude startAttitude) {
-        this.startAttitude = startAttitude;
-    }
-
-    public RandomSeeds getRandomSeeds() {
-        return randomSeeds;
-    }
-
-    public void setRandomSeeds(RandomSeeds randomSeeds) {
-        this.randomSeeds = randomSeeds;
     }
 
     public List<TaskDataGroupDTO> getDataGroups() {

@@ -2,6 +2,7 @@ package com.ruoyi.Xidian.domain;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.util.List;
 
 public class TaskDataGroup implements Serializable {
     private static final long serialVersionUID = 1L;
@@ -9,8 +10,11 @@ public class TaskDataGroup implements Serializable {
     private Long id;
     private Long taskId;
     private String groupName;
+    //数据名称
+    private String dataName;
     private String requestId;
     private String outputType;
+    private Integer sortNo;
     private String outputDirectory;
     private String dataSourceType;
     private String sourceFileName;
@@ -21,9 +25,8 @@ public class TaskDataGroup implements Serializable {
     private String status;
     private Vector3 startVelocity;
     private Attitude startAttitude;
-    private RandomSeeds randomSeeds;
     private Boolean isSimulation;
-    private TaskDataMetric metric;
+    private List<TaskDataMetric> metrics;
 
     public Long getId() {
         return id;
@@ -145,20 +148,12 @@ public class TaskDataGroup implements Serializable {
         this.startAttitude = startAttitude;
     }
 
-    public RandomSeeds getRandomSeeds() {
-        return randomSeeds;
+    public List<TaskDataMetric> getMetrics() {
+        return metrics;
     }
 
-    public void setRandomSeeds(RandomSeeds randomSeeds) {
-        this.randomSeeds = randomSeeds;
-    }
-
-    public TaskDataMetric getMetric() {
-        return metric;
-    }
-
-    public void setMetric(TaskDataMetric metric) {
-        this.metric = metric;
+    public void setMetric(List<TaskDataMetric> metrics) {
+        this.metrics = metrics;
     }
 
     public void setIsSimulation(Boolean isSimulation){
@@ -166,5 +161,18 @@ public class TaskDataGroup implements Serializable {
     }
     public Boolean getIsSimulation(){
         return isSimulation;
+    }
+
+    public void setDataName(String dataName){
+        this.dataName = dataName;
+    }
+    public String getDataName(){
+        return dataName;
+    }
+    public void setSortNo(Integer sortNo){
+        this.sortNo = sortNo;
+    }
+    public Integer getSortNo(){
+        return sortNo;
     }
 }

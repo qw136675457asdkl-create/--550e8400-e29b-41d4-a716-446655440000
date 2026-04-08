@@ -6,7 +6,6 @@ import com.rabbitmq.client.Channel;
 import com.ruoyi.Xidian.config.SimulationPythonProperties;
 import com.ruoyi.Xidian.domain.Attitude;
 import com.ruoyi.Xidian.domain.Coordinate;
-import com.ruoyi.Xidian.domain.RandomSeeds;
 import com.ruoyi.Xidian.domain.Task;
 import com.ruoyi.Xidian.domain.TaskDataGroup;
 import com.ruoyi.Xidian.domain.Vector3;
@@ -15,7 +14,6 @@ import com.ruoyi.Xidian.domain.enums.TaskStatusEnum;
 import com.ruoyi.Xidian.mapper.TaskDataGroupMapper;
 import com.ruoyi.Xidian.mapper.TaskMapper;
 import com.ruoyi.common.core.domain.entity.SysUser;
-import com.ruoyi.common.core.redis.RedisCache;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.framework.web.service.WebSocketServer;
@@ -39,7 +37,6 @@ import java.util.stream.Stream;
 
 @Component
 public class TaskListener {
-    private static final String TASK_SUMMARY_NOTIFY_KEY_PREFIX = "simulation_task_summary_notified:";
 
     @Autowired
     private TaskMapper taskMapper;
@@ -48,13 +45,9 @@ public class TaskListener {
     @Autowired
     private RabbitTemplate rabbitTemplate;
     @Autowired
-    private RedisCache redisCache;
-    @Autowired
     private IDExperimentInfoService dExperimentInfoService;
     @Autowired
     private PythonSimulationService pythonSimulationService;
-    @Autowired
-    private SimulationPythonProperties simulationPythonProperties;
     @Autowired
     private IDdataService iDdataService;
     @Autowired
@@ -68,33 +61,22 @@ public class TaskListener {
             queues = "simulation_task_queue",
             containerFactory = "simulationTaskListenerContainerFactory"
     )
-    public void handleTask(TaskDataGroup taskDataGroup, Channel channel, Message message) throws IOException {
+    public void handleTask(Task task, Channel channel, Message message) throws IOException {
         long deliveryTag = message.getMessageProperties().getDeliveryTag();
 
-        TaskDataGroup currentTaskDataGroup = taskDataGroupMapper.selectById(taskDataGroup.getId());
-        if (currentTaskDataGroup == null) {
-            channel.basicAck(deliveryTag, false);
-            return;
-        }
-        if (TaskStatusEnum.SUCCESS.toString().equals(currentTaskDataGroup.getStatus())) {
+        Task currentTask = taskMapper.selectById(task.getId());
+        if (currentTask == null || TaskStatusEnum.SUCCESS.toString().equals(currentTask.getStatus())) {
             channel.basicAck(deliveryTag, false);
             return;
         }
 
         try {
-            Task task = taskMapper.selectById(taskDataGroup.getTaskId());
-            if (task == null) {
-                throw new ServiceException("Parent task not found, taskId=" + taskDataGroup.getTaskId());
-            }
-
-            taskDataGroup.setStatus(TaskStatusEnum.RUNNING.toString());
-            taskDataGroupMapper.update(taskDataGroup);
-
+            //更新任务状态
             task.setStatus(TaskStatusEnum.RUNNING.toString());
             task.setUpdateTime(new Date());
             taskMapper.update(task);
-
-            TaskToPy taskToPy = buildPythonRequest(task, taskDataGroup);
+            task.setDataGroups(taskDataGroupMapper.selectByTaskId(task.getId()));
+            TaskToPy taskToPy = buildPythonRequest(task, task.getDataGroups());
             JsonNode taskResponse = pythonSimulationService.submitAndWait(taskToPy);
             String directory = getFilePath(taskResponse, "directory");
             List<String> storedFileNames = new ArrayList<>();
@@ -117,22 +99,13 @@ public class TaskListener {
                     task.getExperimentId(),
                     storedFileNames,
                     Filelists,
-                    resolveSampleFrequency(taskDataGroup),
+                    resolveSampleFrequency(task.getDataGroups()),
                     task.getCreateBy(),
                     task.getDataCategorySummary());
 
-            taskDataGroup.setStatus(TaskStatusEnum.SUCCESS.toString());
-            taskDataGroupMapper.update(taskDataGroup);
-
-            Integer remainingSubTaskCount = redisCache.getCacheObject(taskDataGroup.getTaskId().toString());
-            if (remainingSubTaskCount != null && remainingSubTaskCount > 1) {
-                redisCache.setCacheObject(taskDataGroup.getTaskId().toString(), remainingSubTaskCount - 1);
-            } else if (remainingSubTaskCount != null) {
-                task.setStatus(TaskStatusEnum.SUCCESS.toString());
-                task.setUpdateTime(new Date());
-                taskMapper.update(task);
-                redisCache.deleteObject(task.getId().toString());
-            }
+            task.setStatus(TaskStatusEnum.SUCCESS.toString());
+            task.setUpdateTime(new Date());
+            taskMapper.update(task);
             notifyTaskSummaryIfCompleted(task.getId());
             channel.basicAck(deliveryTag, false);
         } catch (Exception exception) {
@@ -140,43 +113,129 @@ public class TaskListener {
             if (retryCount < 3) {
                 channel.basicNack(deliveryTag, false, false);
             } else {
-                taskDataGroup.setStatus(TaskStatusEnum.FAILED.toString());
-                taskDataGroupMapper.update(taskDataGroup);
-                markParentTaskFailed(taskDataGroup.getTaskId());
-                notifyTaskSummaryIfCompleted(taskDataGroup.getTaskId());
+                task.setStatus(TaskStatusEnum.FAILED.toString());
+                notifyTaskSummaryIfCompleted(task.getId());
+                taskMapper.update(task);
+                taskDataGroupMapper.deleteByTaskId(task.getId());
                 rabbitTemplate.send("retry_exchange", "final_routing", message);
                 channel.basicAck(deliveryTag, false);
             }
         }
     }
 
-    private TaskToPy buildPythonRequest(Task task, TaskDataGroup taskDataGroup) {
+    private TaskToPy buildPythonRequest(Task task, List<TaskDataGroup> taskDataGroups) {
         TaskToPy taskToPy = new TaskToPy();
-        taskToPy.setRequest_id(resolveRequestId(task, taskDataGroup));
-        taskToPy.setStart_coords(requireCoordinate(task.getStartCoordinate(), "start coordinate"));
-        taskToPy.setEnd_coords(requireCoordinate(task.getEndCoordinate(), "end coordinate"));
-        taskToPy.setStart_velocity(resolveStartVelocity(taskDataGroup));
-        taskToPy.setStart_attitude(resolveStartAttitude(taskDataGroup));
-        taskToPy.setFlight_start_datetime(requireDate(taskDataGroup.getStartTimeMs(), "subtask start time"));
-        taskToPy.setFlight_end_datetime(requireDate(taskDataGroup.getEndTimeMs(), "subtask end time"));
-        taskToPy.setSample_rate_hz(requireValue(taskDataGroup.getFrequencyHz(), "sample rate"));
-        taskToPy.setNum(requireValue(taskDataGroup.getTargetNum(), "target count"));
-        taskToPy.setHost_trajectory_type(resolveHostTrajectoryType(task.getMotionModel()));
+        taskToPy.setRequestId(resolveRequestId(task));
+        taskToPy.setBasic(buildBasicConfig(task));
+        taskToPy.setDatasets(buildDatasetConfigs(taskDataGroups));
         return taskToPy;
     }
 
-    private String resolveRequestId(Task task, TaskDataGroup taskDataGroup) {
-        if (StringUtils.isNotEmpty(taskDataGroup.getRequestId())) {
-            return taskDataGroup.getRequestId().trim();
-        }
-        return buildPythonRequestId(task, taskDataGroup);
+    private TaskToPy.BasicConfig buildBasicConfig(Task task) {
+        TaskToPy.BasicConfig basicConfig = new TaskToPy.BasicConfig();
+        basicConfig.setMotionModel(resolveHostTrajectoryType(task.getMotionModel()));
+        basicConfig.setStartCoords(requireCoordinate(task.getStartCoordinate(), "start coordinate"));
+        basicConfig.setEndCoords(requireCoordinate(task.getEndCoordinate(), "end coordinate"));
+        return basicConfig;
     }
 
-    private String buildPythonRequestId(Task task, TaskDataGroup taskDataGroup) {
-        String baseRequestId = StringUtils.isNotEmpty(task.getTaskCode())
-                ? task.getTaskCode()
-                : "task-" + task.getId();
-        return baseRequestId + "-group-" + taskDataGroup.getId();
+    private Map<String, TaskToPy.DatasetConfig> buildDatasetConfigs(List<TaskDataGroup> taskDataGroups) {
+        List<TaskDataGroup> groups = requireTaskDataGroups(taskDataGroups);
+        List<TaskDataGroup> sortedGroups = new ArrayList<>(groups);
+        sortedGroups.sort(Comparator
+                .comparing(TaskListener::resolveSortNoOrderValue)
+                .thenComparing(TaskDataGroup::getId, Comparator.nullsLast(Long::compareTo)));
+        Map<String, TaskToPy.DatasetConfig> datasets = new LinkedHashMap<>();
+        for (TaskDataGroup taskDataGroup : sortedGroups) {
+            String datasetKey = resolveDatasetKey(taskDataGroup);
+            TaskToPy.DatasetConfig previous = datasets.put(datasetKey, buildDatasetConfig(taskDataGroup, datasetKey));
+            if (previous != null) {
+                throw new ServiceException("duplicate dataset key: " + datasetKey);
+            }
+        }
+        return datasets;
+    }
+
+    private static Integer resolveSortNoOrderValue(TaskDataGroup taskDataGroup) {
+        if (taskDataGroup == null || taskDataGroup.getSortNo() == null) {
+            return Integer.MAX_VALUE;
+        }
+        return taskDataGroup.getSortNo();
+    }
+
+    private TaskToPy.DatasetConfig buildDatasetConfig(TaskDataGroup taskDataGroup, String datasetKey) {
+        TaskToPy.DatasetConfig datasetConfig = new TaskToPy.DatasetConfig();
+        datasetConfig.setEnabled(Boolean.TRUE);
+        datasetConfig.setFilename(buildDatasetFilename(taskDataGroup));
+        datasetConfig.setFlightStartDatetime(requireDate(taskDataGroup.getStartTimeMs(), datasetKey + " start time"));
+        datasetConfig.setFlightEndDatetime(requireDate(taskDataGroup.getEndTimeMs(), datasetKey + " end time"));
+        datasetConfig.setSampleRateHz(requireValue(taskDataGroup.getFrequencyHz(), datasetKey + " sample rate"));
+        applyTargetNum(datasetConfig, datasetKey, taskDataGroup.getTargetNum());
+        return datasetConfig;
+    }
+
+    private List<TaskDataGroup> requireTaskDataGroups(List<TaskDataGroup> taskDataGroups) {
+        if (taskDataGroups == null || taskDataGroups.isEmpty()) {
+            throw new ServiceException("task data groups are required");
+        }
+        return taskDataGroups;
+    }
+
+    private String resolveRequestId(Task task) {
+        if (StringUtils.isNotEmpty(task.getTaskCode())) {
+            return task.getTaskCode().trim();
+        }
+        if (task.getId() != null) {
+            return "task-" + task.getId();
+        }
+        throw new ServiceException("task code is required");
+    }
+
+    private String resolveDatasetKey(TaskDataGroup taskDataGroup) {
+        if (StringUtils.isNotEmpty(taskDataGroup.getGroupName())) {
+            return taskDataGroup.getGroupName().trim();
+        }
+        return requireText(taskDataGroup.getDataName(), "dataset key");
+    }
+
+    private String buildDatasetFilename(TaskDataGroup taskDataGroup) {
+        String dataName = requireText(taskDataGroup.getDataName(), "dataset data name");
+        String outputType = requireText(taskDataGroup.getOutputType(), "dataset output type");
+        String normalizedOutputType = outputType.startsWith(".")
+                ? outputType.substring(1).trim()
+                : outputType.trim();
+        String lowerCaseFileName = dataName.toLowerCase(Locale.ROOT);
+        String lowerCaseSuffix = "." + normalizedOutputType.toLowerCase(Locale.ROOT);
+        if (lowerCaseFileName.endsWith(lowerCaseSuffix)) {
+            return dataName;
+        }
+        return dataName + "." + normalizedOutputType;
+    }
+
+    private void applyTargetNum(TaskToPy.DatasetConfig datasetConfig, String datasetKey, Integer targetNum) {
+        if (targetNum == null) {
+            return;
+        }
+
+        switch (datasetKey.toLowerCase(Locale.ROOT)) {
+            case "radar_track":
+                datasetConfig.setEnemyNum(targetNum);
+                break;
+            case "ads_b":
+            case "adsb":
+                datasetConfig.setFriendlyNum(targetNum);
+                break;
+            default:
+                datasetConfig.setTargetNum(targetNum);
+                break;
+        }
+    }
+
+    private String requireText(String value, String fieldName) {
+        if (StringUtils.isEmpty(value) || StringUtils.isEmpty(value.trim())) {
+            throw new ServiceException(fieldName + " is required");
+        }
+        return value.trim();
     }
 
     private Coordinate requireCoordinate(Coordinate coordinate, String fieldName) {
@@ -198,73 +257,6 @@ public class TaskListener {
             throw new ServiceException(fieldName + " is required");
         }
         return value;
-    }
-
-    private Vector3 createMockStartVelocity() {
-        return new Vector3(BigDecimal.TEN, BigDecimal.ZERO, BigDecimal.ZERO);
-    }
-
-    private Vector3 resolveStartVelocity(TaskDataGroup taskDataGroup) {
-        Vector3 fallback = createMockStartVelocity();
-        Vector3 configured = taskDataGroup.getStartVelocity();
-        if (configured == null) {
-            return fallback;
-        }
-
-        Vector3 resolved = new Vector3();
-        resolved.setVx(defaultBigDecimal(configured.getVx(), fallback.getVx()));
-        resolved.setVy(defaultBigDecimal(configured.getVy(), fallback.getVy()));
-        resolved.setVz(defaultBigDecimal(configured.getVz(), fallback.getVz()));
-        return resolved;
-    }
-
-    private Attitude createMockStartAttitude() {
-        Attitude attitude = new Attitude();
-        attitude.setRoll(BigDecimal.ZERO);
-        attitude.setPitch(BigDecimal.ZERO);
-        attitude.setYaw(BigDecimal.ZERO);
-        return attitude;
-    }
-
-    private Attitude resolveStartAttitude(TaskDataGroup taskDataGroup) {
-        Attitude fallback = createMockStartAttitude();
-        Attitude configured = taskDataGroup.getStartAttitude();
-        if (configured == null) {
-            return fallback;
-        }
-
-        Attitude resolved = new Attitude();
-        resolved.setRoll(defaultBigDecimal(configured.getRoll(), fallback.getRoll()));
-        resolved.setPitch(defaultBigDecimal(configured.getPitch(), fallback.getPitch()));
-        resolved.setYaw(defaultBigDecimal(configured.getYaw(), fallback.getYaw()));
-        return resolved;
-    }
-
-    private RandomSeeds createDefaultRandomSeeds() {
-        return new RandomSeeds(42, 43, 44, 45);
-    }
-
-    private RandomSeeds resolveRandomSeeds(TaskDataGroup taskDataGroup) {
-        RandomSeeds fallback = createDefaultRandomSeeds();
-        RandomSeeds configured = taskDataGroup.getRandomSeeds();
-        if (configured == null) {
-            return fallback;
-        }
-
-        RandomSeeds resolved = new RandomSeeds();
-        resolved.setHost(defaultInteger(configured.getHost(), fallback.getHost()));
-        resolved.setEnemy(defaultInteger(configured.getEnemy(), fallback.getEnemy()));
-        resolved.setWingman(defaultInteger(configured.getWingman(), fallback.getWingman()));
-        resolved.setAttitude(defaultInteger(configured.getAttitude(), fallback.getAttitude()));
-        return resolved;
-    }
-
-    private BigDecimal defaultBigDecimal(BigDecimal value, BigDecimal fallback) {
-        return value == null ? fallback : value;
-    }
-
-    private Integer defaultInteger(Integer value, Integer fallback) {
-        return value == null ? fallback : value;
     }
 
     private String resolveHostTrajectoryType(String motionModel) {
@@ -298,122 +290,18 @@ public class TaskListener {
         }
     }
 
-    private String resolveOutputDirectory(Task task, TaskDataGroup taskDataGroup) {
-        if (StringUtils.isNotEmpty(taskDataGroup.getOutputDirectory())) {
-            String configuredDirectory = normalizeDirectory(taskDataGroup.getOutputDirectory());
-            if (StringUtils.isNotEmpty(configuredDirectory)) {
-                return configuredDirectory;
-            }
-        }
-
-        String relativePath = StringUtils.isNotEmpty(task.getPath())
-                ? task.getPath()
-                : resolveExperimentRelativePath(task);
-        String normalizedRelativePath = normalizeRelativeOutputPath(relativePath);
-        if (StringUtils.isEmpty(normalizedRelativePath)) {
-            return simulationPythonProperties.getDefaultOutputDirectory();
-        }
-
-        String outputBaseDir = normalizeDirectory(simulationPythonProperties.getOutputBaseDir());
-        if (StringUtils.isEmpty(outputBaseDir)) {
-            return normalizedRelativePath;
-        }
-        return outputBaseDir + "/" + normalizedRelativePath;
-    }
-
-    private String resolveExperimentRelativePath(Task task) {
-        if (StringUtils.isEmpty(task.getExperimentId())) {
-            return null;
-        }
-        return dExperimentInfoService.getExperimentRelativePath(task.getExperimentId());
-    }
-
-    private String normalizeRelativeOutputPath(String path) {
-        String normalized = normalizeDirectory(path);
-        if (StringUtils.isEmpty(normalized)) {
-            return normalized;
-        }
-
-        String localDataRoot = normalizeDirectory(simulationPythonProperties.getLocalDataRoot());
-        if (StringUtils.isNotEmpty(localDataRoot)) {
-            if (normalized.equals(localDataRoot)) {
-                return "";
-            }
-            if (normalized.startsWith(localDataRoot + "/")) {
-                normalized = normalized.substring(localDataRoot.length() + 1);
-            }
-        }
-
-        if (normalized.equals("./data")) {
-            return "";
-        }
-        if (normalized.startsWith("./data/")) {
-            normalized = normalized.substring("./data/".length());
-        }
-
-        while (normalized.startsWith("/")) {
-            normalized = normalized.substring(1);
-        }
-        return normalized;
-    }
-
-    private String normalizeDirectory(String value) {
-        if (StringUtils.isEmpty(value)) {
-            return "";
-        }
-
-        String normalized = value.trim().replace('\\', '/');
-        while (normalized.endsWith("/")) {
-            normalized = normalized.substring(0, normalized.length() - 1);
-        }
-        return normalized;
-    }
-
-    private void markParentTaskFailed(Long taskId) {
-        Task task = taskMapper.selectById(taskId);
-        if (task == null) {
-            return;
-        }
-        task.setStatus(TaskStatusEnum.FAILED.toString());
-        task.setUpdateTime(new Date());
-        taskMapper.update(task);
-        redisCache.deleteObject(taskId.toString());
-    }
-
     private void notifyTaskSummaryIfCompleted(Long taskId) {
         if (taskId == null) {
             return;
         }
 
-        String notifyKey = TASK_SUMMARY_NOTIFY_KEY_PREFIX + taskId;
-        if (Boolean.TRUE.equals(redisCache.hasKey(notifyKey))) {
-            return;
-        }
-
-        List<TaskDataGroup> taskDataGroups = taskDataGroupMapper.selectByTaskId(taskId);
-        if (taskDataGroups == null || taskDataGroups.isEmpty()) {
-            return;
-        }
-
-        long successCount = taskDataGroups.stream()
-                .filter(group -> TaskStatusEnum.SUCCESS.toString().equals(group.getStatus()))
-                .count();
-        long failedCount = taskDataGroups.stream()
-                .filter(group -> TaskStatusEnum.FAILED.toString().equals(group.getStatus()))
-                .count();
-        if (successCount + failedCount != taskDataGroups.size()) {
-            return;
-        }
-
         Task task = taskMapper.selectById(taskId);
         if (task == null || StringUtils.isEmpty(task.getCreateBy())) {
-            redisCache.setCacheObject(notifyKey, Boolean.TRUE);
             return;
         }
 
         SysUser user = sysUserService.selectUserByUserName(task.getCreateBy());
         if (user == null || user.getUserId() == null) {
-            redisCache.setCacheObject(notifyKey, Boolean.TRUE);
             return;
         }
 
@@ -421,19 +309,13 @@ public class TaskListener {
         payload.put("type", "simulation_task_summary");
         payload.put("taskId", taskId);
         payload.put("taskName", task.getTaskName());
-        payload.put("totalCount", taskDataGroups.size());
-        payload.put("successCount", successCount);
-        payload.put("failedCount", failedCount);
-        payload.put("status", failedCount > 0 ? TaskStatusEnum.FAILED.toString() : TaskStatusEnum.SUCCESS.toString());
+        payload.put("status", TaskStatusEnum.SUCCESS.toString());
         payload.put("message", String.format(
-                "\u4efb\u52a1\"%s\"\u5df2\u5b8c\u6210\uff0c\u6210\u529f %d \u6761\uff0c\u5931\u8d25 %d \u6761",
-                task.getTaskName(),
-                successCount,
-                failedCount));
+                "\u4efb\u52a1\"%s\"\u5df2\u5b8c\u6210",
+                task.getTaskName()));
 
         try {
             webSocketServer.sendText(user.getUserId(), objectMapper.writeValueAsString(payload));
-            redisCache.setCacheObject(notifyKey, Boolean.TRUE);
         } catch (Exception ignored) {
         }
     }
@@ -491,11 +373,17 @@ public class TaskListener {
         }
     }
 
-    private Integer resolveSampleFrequency(TaskDataGroup taskDataGroup) {
-        if (taskDataGroup == null || taskDataGroup.getFrequencyHz() == null) {
+    private Integer resolveSampleFrequency(List<TaskDataGroup> taskDataGroups) {
+        if (taskDataGroups == null || taskDataGroups.isEmpty()) {
             return null;
         }
-        return taskDataGroup.getFrequencyHz().intValue();
+
+        for (TaskDataGroup taskDataGroup : taskDataGroups) {
+            if (taskDataGroup != null && taskDataGroup.getFrequencyHz() != null) {
+                return taskDataGroup.getFrequencyHz().intValue();
+            }
+        }
+        return null;
     }
 
     private void deleteFile(String path) throws IOException {

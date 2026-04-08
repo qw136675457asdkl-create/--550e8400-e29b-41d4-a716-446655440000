@@ -15,8 +15,8 @@ public class SimulationRabbitListenerConfig {
     ) {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         configurer.configure(factory, connectionFactory);
-        factory.setConcurrentConsumers(1);
-        factory.setMaxConcurrentConsumers(1);
+        factory.setConcurrentConsumers(4);
+        factory.setMaxConcurrentConsumers(8);
         factory.setPrefetchCount(1);
         return factory;
     }

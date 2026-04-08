@@ -499,6 +499,22 @@ const simulationTabs = [
   { code: 'DATA10', label: '数据 10', showDataSource: true, showTargetNum: true }
 ]
 
+const SIMULATION_GROUP_NAME_SUBMIT_MAP = {
+  INS: 'aircraft_inertial',
+  ATTITUDE: 'attitude',
+  RADAR_TRACK: 'radar_track',
+  ADS_B: 'ads_b'
+}
+
+const SIMULATION_GROUP_NAME_DISPLAY_MAP = simulationTabs.reduce((map, tab) => {
+  map[tab.code] = tab.label
+  const submitName = SIMULATION_GROUP_NAME_SUBMIT_MAP[tab.code]
+  if (submitName) {
+    map[submitName] = tab.label
+  }
+  return map
+}, {})
+
 const attitudeMetricBlueprint = [
   { fieldName: 'timestamp', dataType: 'BigInt', recommendedValue: '/', fluctuationRange: '/', description: '时间戳' },
   { fieldName: 'euler_pitch', dataType: 'Float', recommendedValue: '/', fluctuationRange: '/', description: '俯仰角。' },
@@ -801,6 +817,43 @@ function createEmptyTaskDetail() {
   }
 }
 
+function resolveSimulationGroupName(tabCode) {
+  const normalizedCode = String(tabCode || '').trim()
+  return SIMULATION_GROUP_NAME_SUBMIT_MAP[normalizedCode] || normalizedCode
+}
+
+function formatSimulationGroupName(groupName) {
+  const normalizedName = String(groupName || '').trim()
+  if (!normalizedName) {
+    return '--'
+  }
+  return SIMULATION_GROUP_NAME_DISPLAY_MAP[normalizedName] || normalizedName
+}
+
+function formatSimulationGroupSummary(summary) {
+  const rawSummary = String(summary || '').trim()
+  if (!rawSummary) {
+    return '--'
+  }
+
+  const translated = rawSummary
+    .split(/[、,，;；|]+/)
+    .map(item => formatSimulationGroupName(item))
+    .filter(item => item && item !== '--')
+    .join('、')
+
+  return translated || rawSummary
+}
+
+function normalizeTaskDataGroups(groups) {
+  return Array.isArray(groups)
+    ? groups.map(group => ({
+        ...group,
+        groupName: formatSimulationGroupName(group.groupName)
+      }))
+    : []
+}
+
 function getTaskStatusText(status) {
   const statusMap = {
     DRAFT: '待提交',
@@ -870,7 +923,7 @@ function normalizeTaskRow(row) {
     ...row,
     projectName: row.projectName || project?.projectName || '--',
     experimentName: row.experimentName || experiment?.experimentName || '--',
-    dataCategorySummary: row.dataCategorySummary || '--'
+    dataCategorySummary: formatSimulationGroupSummary(row.dataCategorySummary)
   }
 }
 
@@ -1144,7 +1197,7 @@ function buildTaskPayload() {
     endCoordinate: simulationForm.endCoordinate,
     dataGroups: enabledTabs.map(item => ({
       groupCode: item.code,
-      groupName: item.label,
+      groupName: resolveSimulationGroupName(item.code),
       sortNo: item.sortNo,
       enabled: true,
       items: [
@@ -1319,7 +1372,7 @@ async function handleView(row) {
     ...createEmptyTaskDetail(),
     ...taskDetail
   })
-  detailDialogData.value.dataGroups = Array.isArray(taskDetail.dataGroups) ? taskDetail.dataGroups : []
+  detailDialogData.value.dataGroups = normalizeTaskDataGroups(taskDetail.dataGroups)
   detailDialogOpen.value = true
 }
 

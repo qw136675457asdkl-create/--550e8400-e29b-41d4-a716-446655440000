@@ -20,7 +20,6 @@ public class TaskDataItemDTO {
     private Integer targetNum;
     private Vector3 startVelocity;
     private Attitude startAttitude;
-    private RandomSeeds randomSeeds;
     private List<TaskDataMetricDTO> metrics;
 
     public String getDataName() {
@@ -94,12 +93,6 @@ public class TaskDataItemDTO {
     }
     public void setStartAttitude(Attitude startAttitude) {
         this.startAttitude = startAttitude;
-    }
-    public RandomSeeds getRandomSeeds() {
-        return randomSeeds;
-    }
-    public void setRandomSeeds(RandomSeeds randomSeeds) {
-        this.randomSeeds = randomSeeds;
     }
     public List<TaskDataMetricDTO> getMetrics() {
         return metrics;

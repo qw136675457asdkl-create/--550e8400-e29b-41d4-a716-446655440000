@@ -2,6 +2,7 @@ package com.ruoyi.Xidian.mapper;
 
 import com.ruoyi.Xidian.domain.TaskDataGroup;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -16,4 +17,6 @@ public interface TaskDataGroupMapper  {
     List<TaskDataGroup> selectByTaskId(Long taskId);
 
     void deleteByTaskId(Long taskId);
+
+    int batchInsert(@Param("list") List<TaskDataGroup> list);
 }

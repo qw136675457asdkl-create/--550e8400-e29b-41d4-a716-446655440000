@@ -3,84 +3,62 @@ package com.ruoyi.Xidian.domain;
 import java.io.Serializable;
 import java.math.BigDecimal;
 
-//指标明细
+//字段说明
 public class TaskDataMetric implements Serializable {
     private static final long serialVersionUID = 1L;
     // 这一行数据的ID
-    private Long id;
-    private Long taskId;
-    private Long timeStamp;
-    // 属于哪个数据项
+    private String fieldName;
+    private String dataType;
+    private String recommendedValue;
+    private String fluctuationRange;
+    private String description;
+    private Integer sortNo;
 
-    private Attitude attitude;
-    private Rate rate;
-    private Long dataGroupId;
-    private BigDecimal flightPath;
-    private BigDecimal angleAttitude;
-    private BigDecimal sideslipAngle;
-    private Enum<?> ahrsStatus;
+    public String getFieldName() {
+        return fieldName;
+    }
 
+    public void setFieldName(String fieldName) {
+        this.fieldName = fieldName;
+    }
 
-    //getters
-    public Long getId() {
-        return id;
+    public String getDataType() {
+        return dataType;
     }
-    public Long getDataGroupId() {
-        return dataGroupId;
+
+    public void setDataType(String dataType) {
+        this.dataType = dataType;
     }
-    public Long getTimeStamp() {
-        return timeStamp;
+
+    public String getRecommendedValue() {
+        return recommendedValue;
     }
-    //setters
-    public void setId(Long id) {
-        this.id = id;
+
+    public void setRecommendedValue(String recommendedValue) {
+        this.recommendedValue = recommendedValue;
     }
-    public void setDataGroupId(Long dataGroupId) {
-        this.dataGroupId = dataGroupId;
+
+    public String getFluctuationRange() {
+        return fluctuationRange;
     }
-    public void setTimeStamp(Long timeStamp) {
-        this.timeStamp = timeStamp;
+
+    public void setFluctuationRange(String fluctuationRange) {
+        this.fluctuationRange = fluctuationRange;
     }
-    public void setAttitude(Attitude attitude) {
-        this.attitude = attitude;
+
+    public String getDescription() {
+        return description;
     }
-    public Attitude getAttitude() {
-        return attitude;
+
+    public void setDescription(String description) {
+        this.description = description;
     }
-    public void setRate(Rate rate) {
-        this.rate = rate;
+
+    public Integer getSortNo() {
+        return sortNo;
     }
-    public Rate getRate() {
-        return rate;
-    }
-    public void setFlightPath(BigDecimal flightPath) {
-        this.flightPath = flightPath;
-    }
-    public BigDecimal getFlightPath() {
-        return flightPath;
-    }
-    public void setAngleAttitude(BigDecimal angleAttitude) {
-        this.angleAttitude = angleAttitude;
-    }
-    public BigDecimal getAngleAttitude() {
-        return angleAttitude;
-    }
-    public void setSideslipAngle(BigDecimal sideslipAngle) {
-        this.sideslipAngle = sideslipAngle;
-    }
-    public BigDecimal getSideslipAngle() {
-        return sideslipAngle;
-    }
-    public void setAhrsStatus(Enum<?> ahrsStatus) {
-        this.ahrsStatus = ahrsStatus;
-    }
-    public Enum<?> getAhrsStatus() {
-        return ahrsStatus;
-    }
-    public Long getTaskId() {
-        return taskId;
-    }
-    public void setTaskId(Long taskId) {
-        this.taskId = taskId;
+
+    public void setSortNo(Integer sortNo) {
+        this.sortNo = sortNo;
     }
 }

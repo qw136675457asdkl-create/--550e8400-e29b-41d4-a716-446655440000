@@ -1,128 +1,183 @@
 package com.ruoyi.Xidian.domain.DTO;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.ruoyi.Xidian.domain.Attitude;
 import com.ruoyi.Xidian.domain.Coordinate;
-import com.ruoyi.Xidian.domain.RandomSeeds;
-import com.ruoyi.Xidian.domain.Vector3;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class TaskToPy implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @JsonProperty("request_id")
-    private String request_id;
+    private String requestId;
 
-    @JsonProperty("start_coords")
-    private Coordinate start_coords;
+    @JsonProperty("basic")
+    private BasicConfig basic;
 
-    @JsonProperty("end_coords")
-    private Coordinate end_coords;
+    @JsonProperty("datasets")
+    private Map<String, DatasetConfig> datasets = new LinkedHashMap<>();
 
-    @JsonProperty("start_velocity")
-    private Vector3 start_velocity;
-
-    @JsonProperty("start_attitude")
-    private Attitude start_attitude;
-
-    @JsonProperty("flight_start_datetime")
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
-    private Date flight_start_datetime;
-
-    @JsonProperty("flight_end_datetime")
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
-    private Date flight_end_datetime;
-
-    @JsonProperty("sample_rate_hz")
-    private BigDecimal sample_rate_hz;
-
-    @JsonProperty("num")
-    private Integer num;
-
-    @JsonProperty("host_trajectory_type")
-    private String host_trajectory_type;
-
-    public String getRequest_id() {
-        return request_id;
+    public String getRequestId() {
+        return requestId;
     }
 
-    public void setRequest_id(String request_id) {
-        this.request_id = request_id;
+    public void setRequestId(String requestId) {
+        this.requestId = requestId;
     }
 
-    public Coordinate getStart_coords() {
-        return start_coords;
+    public BasicConfig getBasic() {
+        return basic;
     }
 
-    public void setStart_coords(Coordinate start_coords) {
-        this.start_coords = start_coords;
+    public void setBasic(BasicConfig basic) {
+        this.basic = basic;
     }
 
-    public Coordinate getEnd_coords() {
-        return end_coords;
+    public Map<String, DatasetConfig> getDatasets() {
+        return datasets;
     }
 
-    public void setEnd_coords(Coordinate end_coords) {
-        this.end_coords = end_coords;
+    public void setDatasets(Map<String, DatasetConfig> datasets) {
+        this.datasets = datasets == null ? new LinkedHashMap<>() : datasets;
     }
 
-    public Vector3 getStart_velocity() {
-        return start_velocity;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class BasicConfig implements Serializable {
+        private static final long serialVersionUID = 1L;
+
+        @JsonProperty("motion_model")
+        private String motionModel;
+
+        @JsonProperty("start_coords")
+        private Coordinate startCoords;
+
+        @JsonProperty("end_coords")
+        private Coordinate endCoords;
+
+        public String getMotionModel() {
+            return motionModel;
+        }
+
+        public void setMotionModel(String motionModel) {
+            this.motionModel = motionModel;
+        }
+
+        public Coordinate getStartCoords() {
+            return startCoords;
+        }
+
+        public void setStartCoords(Coordinate startCoords) {
+            this.startCoords = startCoords;
+        }
+
+        public Coordinate getEndCoords() {
+            return endCoords;
+        }
+
+        public void setEndCoords(Coordinate endCoords) {
+            this.endCoords = endCoords;
+        }
     }
 
-    public void setStart_velocity(Vector3 start_velocity) {
-        this.start_velocity = start_velocity;
-    }
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class DatasetConfig implements Serializable {
+        private static final long serialVersionUID = 1L;
 
-    public Attitude getStart_attitude() {
-        return start_attitude;
-    }
+        @JsonProperty("enabled")
+        private Boolean enabled;
 
-    public void setStart_attitude(Attitude start_attitude) {
-        this.start_attitude = start_attitude;
-    }
+        @JsonProperty("filename")
+        private String filename;
 
-    public BigDecimal getSample_rate_hz() {
-        return sample_rate_hz;
-    }
+        @JsonProperty("flight_start_datetime")
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss.SSS", timezone = "GMT+8")
+        private Date flightStartDatetime;
 
-    public void setSample_rate_hz(BigDecimal sample_rate_hz) {
-        this.sample_rate_hz = sample_rate_hz;
-    }
+        @JsonProperty("flight_end_datetime")
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss.SSS", timezone = "GMT+8")
+        private Date flightEndDatetime;
 
-    public Integer getNum() {
-        return num;
-    }
+        @JsonProperty("sample_rate_hz")
+        private BigDecimal sampleRateHz;
 
-    public void setNum(Integer num) {
-        this.num = num;
-    }
+        @JsonProperty("target_num")
+        private Integer targetNum;
 
-    public String getHost_trajectory_type() {
-        return host_trajectory_type;
-    }
+        @JsonProperty("enemy_num")
+        private Integer enemyNum;
 
-    public void setHost_trajectory_type(String host_trajectory_type) {
-        this.host_trajectory_type = host_trajectory_type;
-    }
+        @JsonProperty("friendly_num")
+        private Integer friendlyNum;
 
-    public Date getFlight_start_datetime() {
-        return flight_start_datetime;
-    }
+        public Boolean getEnabled() {
+            return enabled;
+        }
 
-    public void setFlight_start_datetime(Date flight_start_datetime) {
-        this.flight_start_datetime = flight_start_datetime;
-    }
+        public void setEnabled(Boolean enabled) {
+            this.enabled = enabled;
+        }
 
-    public Date getFlight_end_datetime() {
-        return flight_end_datetime;
-    }
+        public String getFilename() {
+            return filename;
+        }
 
-    public void setFlight_end_datetime(Date flight_end_datetime) {
-        this.flight_end_datetime = flight_end_datetime;
+        public void setFilename(String filename) {
+            this.filename = filename;
+        }
+
+        public Date getFlightStartDatetime() {
+            return flightStartDatetime;
+        }
+
+        public void setFlightStartDatetime(Date flightStartDatetime) {
+            this.flightStartDatetime = flightStartDatetime;
+        }
+
+        public Date getFlightEndDatetime() {
+            return flightEndDatetime;
+        }
+
+        public void setFlightEndDatetime(Date flightEndDatetime) {
+            this.flightEndDatetime = flightEndDatetime;
+        }
+
+        public BigDecimal getSampleRateHz() {
+            return sampleRateHz;
+        }
+
+        public void setSampleRateHz(BigDecimal sampleRateHz) {
+            this.sampleRateHz = sampleRateHz;
+        }
+
+        public Integer getTargetNum() {
+            return targetNum;
+        }
+
+        public void setTargetNum(Integer targetNum) {
+            this.targetNum = targetNum;
+        }
+
+        public Integer getEnemyNum() {
+            return enemyNum;
+        }
+
+        public void setEnemyNum(Integer enemyNum) {
+            this.enemyNum = enemyNum;
+        }
+
+        public Integer getFriendlyNum() {
+            return friendlyNum;
+        }
+
+        public void setFriendlyNum(Integer friendlyNum) {
+            this.friendlyNum = friendlyNum;
+        }
     }
 }

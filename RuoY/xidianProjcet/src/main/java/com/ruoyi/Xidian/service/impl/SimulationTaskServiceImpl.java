@@ -3,23 +3,22 @@ package com.ruoyi.Xidian.service.impl;
 import com.ruoyi.Xidian.domain.DTO.TaskCreateRequest;
 import com.ruoyi.Xidian.domain.DTO.TaskDataGroupDTO;
 import com.ruoyi.Xidian.domain.DTO.TaskDataItemDTO;
+import com.ruoyi.Xidian.domain.DTO.TaskDataMetricDTO;
 import com.ruoyi.Xidian.domain.Task;
 import com.ruoyi.Xidian.domain.TaskDataGroup;
+import com.ruoyi.Xidian.domain.TaskDataMetric;
 import com.ruoyi.Xidian.domain.enums.TaskStatusEnum;
+import com.ruoyi.Xidian.mapper.DdataMapper;
 import com.ruoyi.Xidian.mapper.TaskDataGroupMapper;
 import com.ruoyi.Xidian.mapper.TaskMapper;
 import com.ruoyi.Xidian.service.SimulationTaskService;
-import com.ruoyi.common.core.redis.RedisCache;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,20 +30,20 @@ public class SimulationTaskServiceImpl implements SimulationTaskService {
     private final TaskDataGroupMapper taskDataGroupMapper;
     private final DExperimentInfoServiceImpl dExperimentInfoService;
     private final RabbitTemplate rabbitTemplate;
-    private final RedisCache redisCache;
+    private final DdataMapper dataMapper;
 
     public SimulationTaskServiceImpl(
             TaskMapper taskMapper,
             TaskDataGroupMapper taskDataGroupMapper,
             DExperimentInfoServiceImpl dExperimentInfoService,
             RabbitTemplate rabbitTemplate,
-            RedisCache redisCache
+            DdataMapper dataMapper
     ) {
         this.taskMapper = taskMapper;
         this.taskDataGroupMapper = taskDataGroupMapper;
         this.dExperimentInfoService = dExperimentInfoService;
         this.rabbitTemplate = rabbitTemplate;
-        this.redisCache = redisCache;
+        this.dataMapper = dataMapper;
     }
 
     @Override
@@ -57,29 +56,26 @@ public class SimulationTaskServiceImpl implements SimulationTaskService {
         if (!hasSubTaskConfig(request)) {
             throw new ServiceException("至少需要配置一个子任务");
         }
-
         Date now = new Date();
         Task task = buildTask(request, now);
         taskMapper.insert(task);
-
         if (task.getId() == null) {
             throw new ServiceException("主任务创建失败，未获取到任务ID");
         }
-
         List<TaskDataGroup> subTasks = buildSubTasks(task.getId(), request);
         for (TaskDataGroup group : subTasks) {
-            taskDataGroupMapper.insert(group);
-            if (group.getId() == null) {
-                throw new ServiceException("子任务创建失败，未获取到子任务ID");
+            if (dataMapper.selectSameNameFile(task.getExperimentId(),"/" + group.getDataName() + group.getOutputType()) != null){
+                taskMapper.deleteById(task.getId());
+                throw new ServiceException(group.getGroupName() + "数据名称重复，请重新输入");
             }
-            if (group.getTargetNum() < 3){
+            if (group.getTargetNum() < 3 && (Objects.equals(group.getDataName(), "radar_track") || Objects.equals(group.getDataName(), "ads_b"))){
+                taskMapper.deleteById(task.getId());
                 throw new ServiceException("目标数量不少于三个");
             }
-            rabbitTemplate.convertAndSend(EXCHANGE_NAME, ROUTING_KEY, group);
         }
-
-        redisCache.setCacheObject(task.getId().toString(), subTasks.size());
+        taskDataGroupMapper.batchInsert(subTasks);
         task.setDataGroups(subTasks);
+        rabbitTemplate.convertAndSend(EXCHANGE_NAME, ROUTING_KEY, task);
         return task;
     }
 
@@ -102,7 +98,6 @@ public class SimulationTaskServiceImpl implements SimulationTaskService {
     public void deleteTask(Long id) {
         taskDataGroupMapper.deleteByTaskId(id);
         taskMapper.deleteById(id);
-        redisCache.deleteObject(id.toString());
     }
 
     private Task buildTask(TaskCreateRequest request, Date now) {
@@ -133,24 +128,38 @@ public class SimulationTaskServiceImpl implements SimulationTaskService {
             for (TaskDataItemDTO itemDTO : defaultIfNull(groupDTO.getItems())) {
                 TaskDataGroup group = new TaskDataGroup();
                 group.setTaskId(taskId);
-                group.setGroupName(StringUtils.isNotEmpty(itemDTO.getDataName()) ? itemDTO.getDataName() : groupDTO.getGroupName());
+                group.setGroupName(groupDTO.getGroupName());
+                group.setSortNo(groupDTO.getSortNo());
+                group.setDataName(StringUtils.isNotEmpty(itemDTO.getDataName()) ? itemDTO.getDataName() : groupDTO.getGroupName());
                 group.setRequestId(itemDTO.getRequestId());
                 group.setOutputType(itemDTO.getOutputType());
-                group.setOutputDirectory(itemDTO.getOutputDirectory());
                 group.setDataSourceType(itemDTO.getDataSourceType());
                 group.setSourceFileName(itemDTO.getSourceFileName());
                 group.setStartTimeMs(itemDTO.getStartTimeMs());
                 group.setEndTimeMs(itemDTO.getEndTimeMs());
                 group.setFrequencyHz(itemDTO.getFrequencyHz());
                 group.setTargetNum(itemDTO.getTargetNum());
-                group.setStartVelocity(itemDTO.getStartVelocity() != null ? itemDTO.getStartVelocity() : request.getStartVelocity());
-                group.setStartAttitude(itemDTO.getStartAttitude() != null ? itemDTO.getStartAttitude() : request.getStartAttitude());
-                group.setRandomSeeds(itemDTO.getRandomSeeds() != null ? itemDTO.getRandomSeeds() : request.getRandomSeeds());
+                group.setMetric(buildMetrics(itemDTO.getMetrics()));
                 group.setStatus(TaskStatusEnum.DRAFT.name());
                 subTasks.add(group);
             }
         }
         return subTasks;
+    }
+
+    private List<TaskDataMetric> buildMetrics(List<TaskDataMetricDTO> metricDTOs) {
+        List<TaskDataMetric> metrics = new ArrayList<>();
+        for (TaskDataMetricDTO metricDTO : defaultIfNull(metricDTOs)) {
+            TaskDataMetric metric = new TaskDataMetric();
+            metric.setFieldName(metricDTO.getFieldName());
+            metric.setDataType(metricDTO.getDataType());
+            metric.setRecommendedValue(metricDTO.getRecommendedValue());
+            metric.setFluctuationRange(metricDTO.getFluctuationRange());
+            metric.setDescription(metricDTO.getDescription());
+            metric.setSortNo(metricDTO.getSortNo());
+            metrics.add(metric);
+        }
+        return metrics;
     }
 
     private String buildDataCategorySummary(TaskCreateRequest request) {
