@@ -1,89 +1,79 @@
 <template>
   <div class="app-container">
-    <div v-show="showSearch" class="filter-card">
-      <el-form
-        ref="queryRef"
-        :model="queryParams"
-        class="filter-form"
-        label-position="top"
-      >
-        <el-row :gutter="16" class="filter-row">
-          <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6" class="filter-col">
-            <el-form-item class="filter-item" label="ID" prop="experimentId">
-              <el-input
-                v-model="queryParams.experimentId"
-                class="filter-control"
-                placeholder="请输入数据ID"
-                clearable
-                @keyup.enter="handleQuery"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6" class="filter-col">
-            <el-form-item class="filter-item" label="试验名称" prop="experimentName">
-              <el-input
-                v-model="queryParams.experimentName"
-                class="filter-control"
-                placeholder="请输入试验名称"
-                clearable
-                @keyup.enter="handleQuery"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6" class="filter-col">
-            <el-form-item class="filter-item" label="所属项目" prop="projectId">
-              <el-select v-model="queryParams.projectId" class="filter-control" placeholder="请选择所属项目" clearable>
-                <el-option v-for="item in projectOptions" :key="item.projectId" :label="item.projectName" :value="item.projectId" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6" class="filter-col">
-            <el-form-item class="filter-item" label="创建人" prop="createBy">
-              <el-input
-                v-model="queryParams.createBy"
-                class="filter-control"
-                placeholder="请输入创建人"
-                clearable
-                @keyup.enter="handleQuery"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="24" :md="16" :lg="8" :xl="8" class="filter-col filter-col-range">
-            <el-form-item class="filter-item" label="创建时间">
-              <el-date-picker
-                v-model="dateRange"
-                class="filter-control filter-control-range"
-                value-format="YYYY-MM-DD"
-                type="daterange"
-                range-separator="-"
-                start-placeholder="开始日期"
-                end-placeholder="结束日期"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="24" :md="8" :lg="8" :xl="6" class="filter-col filter-col-actions">
-            <el-form-item class="filter-item filter-item-actions">
-              <div class="filter-action-group">
-                <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
-                <el-button class="filter-reset-button" icon="Refresh" @click="resetQuery">重置</el-button>
-              </div>
-            </el-form-item>
-          </el-col>
-        </el-row>
-      </el-form>
-    </div>
+    <el-form
+      ref="queryRef"
+      :model="queryParams"
+      :inline="true"
+      v-show="showSearch"
+      label-width="76px"
+      class="query-form"
+    >
+      <el-form-item label="ID" prop="experimentId">
+        <el-input
+          v-model="queryParams.experimentId"
+          placeholder="请输入数据ID"
+          clearable
+          style="width: 240px"
+          @keyup.enter="handleQuery"
+        />
+      </el-form-item>
+      <el-form-item label="试验名称" prop="experimentName">
+        <el-input
+          v-model="queryParams.experimentName"
+          placeholder="请输入试验名称"
+          clearable
+          style="width: 240px"
+          @keyup.enter="handleQuery"
+        />
+      </el-form-item>
+      <el-form-item label="所属项目" prop="projectId">
+        <el-select
+          v-model="queryParams.projectId"
+          placeholder="请选择所属项目"
+          clearable
+          style="width: 240px"
+        >
+          <el-option
+            v-for="item in projectOptions"
+            :key="item.projectId"
+            :label="item.projectName"
+            :value="item.projectId"
+          />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="创建人" prop="createBy">
+        <el-input
+          v-model="queryParams.createBy"
+          placeholder="请输入创建人"
+          clearable
+          style="width: 240px"
+          @keyup.enter="handleQuery"
+        />
+      </el-form-item>
+      <el-form-item label="创建时间" style="width: 308px">
+        <el-date-picker
+          v-model="dateRange"
+          value-format="YYYY-MM-DD"
+          type="daterange"
+          range-separator="-"
+          start-placeholder="开始日期"
+          end-placeholder="结束日期"
+        />
+      </el-form-item>
+      <el-form-item>
+        <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
+        <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+      </el-form-item>
+    </el-form>
 
-    <div class="table-card">
-      <div class="table-toolbar">
-        <div class="table-toolbar-right">
-          <el-tooltip content="刷新" placement="top">
-            <el-button class="refresh-tool-button" circle icon="Refresh" @click="refresh" />
-          </el-tooltip>
-          <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
-        </div>
-      </div>
+    <el-row :gutter="10" class="mb8">
+      <el-col :span="1.5">
+        <el-button icon="Refresh" @click="refresh">刷新</el-button>
+      </el-col>
+      <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
+    </el-row>
 
-      <el-table v-loading="loading" :data="businessList" class="simulation-table">
+    <el-table v-loading="loading" :data="businessList">
         <el-table-column label="ID" align="center" prop="experimentId" />
         <el-table-column label="试验名称" align="center" prop="experimentName" :show-overflow-tooltip="true" />
         <el-table-column label="所属项目" align="center" prop="projectName" :show-overflow-tooltip="true" />
@@ -101,24 +91,22 @@
             <span>{{ parseTime(scope.row.createTime) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" align="center" class-name="small-padding fixed-width action-column">
+        <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
           <template #default="scope">
             <el-tooltip content="态势显示" placement="top">
-              <el-button link class="action-link action-link-view" @click="handleView(scope.row)">查看</el-button>
+              <el-button link type="primary" @click="handleView(scope.row)">查看</el-button>
             </el-tooltip>
           </template>
         </el-table-column>
-      </el-table>
+    </el-table>
 
-      <pagination
-        class="table-pagination"
-        v-show="total > 0"
-        :total="total"
-        v-model:page="queryParams.pageNum"
-        v-model:limit="queryParams.pageSize"
-        @pagination="getList"
-      />
-    </div>
+    <pagination
+      v-show="total > 0"
+      :total="total"
+      v-model:page="queryParams.pageNum"
+      v-model:limit="queryParams.pageSize"
+      @pagination="getList"
+    />
 
     <el-dialog
       v-if="false"
@@ -626,198 +614,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.app-container {
-  font-family: PingFang SC, Microsoft YaHei, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-}
-
-.filter-card,
-.table-card {
-  background: #ffffff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.filter-card {
-  margin-bottom: 24px;
-  padding: 18px 24px 8px;
-}
-
-.filter-form {
-  width: 100%;
-}
-
-.filter-row {
-  align-items: flex-start;
-  row-gap: 2px;
-}
-
-.filter-item {
-  margin-bottom: 16px;
-}
-
-.filter-col {
-  display: flex;
-}
-
-.filter-col :deep(.el-form-item) {
-  width: 100%;
-}
-
-.filter-action-group {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 10px;
-  min-height: 40px;
-  margin-left: 0;
-  flex-wrap: wrap;
-}
-
-.filter-item-actions {
-  padding-top: 31px;
-  margin-left: auto;
-}
-
-.table-card {
-  padding: 16px 20px 8px;
-}
-
-.table-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 16px;
-}
-
-.table-toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.table-pagination {
-  margin-top: 16px;
-}
-
-:deep(.filter-form .el-form-item__label) {
-  padding-bottom: 8px;
-  color: #1f1f1f;
-  font-weight: 500;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-:deep(.filter-control.el-input),
-:deep(.filter-control.el-select) {
-  width: 100%;
-  max-width: none;
-}
-
-:deep(.filter-control.el-date-editor) {
-  width: 100%;
-  max-width: none;
-}
-
-:deep(.filter-control .el-input__wrapper),
-:deep(.filter-control .el-select__wrapper),
-:deep(.filter-control.el-range-editor.el-input__wrapper) {
-  min-height: 40px;
-  border-radius: 8px;
-  box-shadow: 0 0 0 1px #d9d9d9 inset;
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
-}
-
-:deep(.filter-form .el-input__inner),
-:deep(.filter-form .el-select__selected-item),
-:deep(.filter-form .el-range-input) {
-  font-size: 13px;
-}
-
-:deep(.filter-form .el-input__wrapper:hover),
-:deep(.filter-form .el-select__wrapper:hover),
-:deep(.filter-form .el-range-editor.el-input__wrapper:hover) {
-  box-shadow: 0 0 0 1px #409eff inset;
-}
-
-:deep(.filter-form .el-input__wrapper.is-focus),
-:deep(.filter-form .el-select__wrapper.is-focused),
-:deep(.filter-form .el-range-editor.el-input__wrapper.is-focus) {
-  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.15), 0 0 0 1px #409eff inset;
-}
-
-:deep(.filter-action-group .el-button) {
-  min-height: 40px;
-  min-width: 92px;
-  padding: 0 18px;
-  border-radius: 8px;
-}
-
-:deep(.filter-action-group .el-button--primary) {
-  background: #409eff;
-  border-color: #409eff;
-}
-
-.filter-reset-button {
-  color: #409eff;
-  background: #ffffff;
-  border-color: #d9d9d9;
-}
-
-.refresh-tool-button {
-  border-color: #d9d9d9;
-  color: #595959;
-  background: #ffffff;
-}
-
-:deep(.refresh-tool-button:hover) {
-  color: #409eff;
-  border-color: #409eff;
-  background: #ecf5ff;
-}
-
-:deep(.simulation-table) {
-  --el-table-border-color: #f0f0f0;
-  --el-table-header-bg-color: #fafafa;
-  --el-table-row-hover-bg-color: #f5faff;
-  border-radius: 8px;
-}
-
-:deep(.simulation-table .el-table__inner-wrapper::before) {
-  height: 0;
-}
-
-:deep(.simulation-table th.el-table__cell) {
-  background: #fafafa;
-  color: #1f1f1f;
-  font-weight: 600;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-:deep(.simulation-table td.el-table__cell),
-:deep(.simulation-table th.el-table__cell.is-leaf) {
-  border-right: none;
-}
-
-:deep(.simulation-table .el-table__row td.el-table__cell) {
-  height: 54px;
-  padding-top: 0;
-  padding-bottom: 0;
-  color: #434343;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-:deep(.simulation-table .el-table__body tr:hover > td.el-table__cell) {
-  background: #f5faff !important;
-}
-
-:deep(.simulation-table .action-link) {
-  padding: 0;
-  font-weight: 500;
-}
-
-:deep(.simulation-table .action-link-view) {
-  color: #409eff;
-}
-
 :deep(.preview-dialog .el-dialog) {
   border-radius: 16px;
   overflow: hidden;
@@ -1101,47 +897,22 @@ onBeforeUnmount(() => {
   background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
 }
 
-@media (max-width: 1440px) {
-  .filter-card {
-    padding-left: 20px;
-    padding-right: 20px;
-  }
-
-  .filter-item-actions {
-    margin-left: 0;
-  }
-}
-
 @media (max-width: 768px) {
-  .filter-card,
-  .table-card {
-    padding-left: 16px;
-    padding-right: 16px;
+  :deep(.query-form.el-form--inline .el-form-item) {
+    display: flex;
+    width: 100% !important;
+    margin-right: 0;
   }
 
-  .filter-row {
-    row-gap: 0;
-  }
-
-  .filter-col,
-  .filter-col-range,
-  .filter-col-actions {
-    width: 100%;
-  }
-
-  .filter-action-group {
-    justify-content: flex-start;
-    width: 100%;
-  }
-
-  .filter-item-actions {
-    padding-top: 0;
-    margin-left: 0;
-  }
-
-  :deep(.filter-action-group .el-button) {
-    flex: 1 1 calc(50% - 5px);
+  :deep(.query-form.el-form--inline .el-form-item__content) {
+    flex: 1;
     min-width: 0;
+  }
+
+  :deep(.query-form .el-input),
+  :deep(.query-form .el-select),
+  :deep(.query-form .el-date-editor) {
+    width: 100% !important;
   }
 
   .preview-window {
