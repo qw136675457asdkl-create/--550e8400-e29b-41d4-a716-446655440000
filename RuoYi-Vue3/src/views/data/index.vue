@@ -101,37 +101,45 @@
                                 <el-button
                                   class="toolbar-action-btn toolbar-action-btn--project"
                                   type="primary"
-                                  icon="Plus"
                                   @click="handleAddProject"
                                   v-hasPermi="['data:info:addProject']"
                                 >
+                                  <template #icon>
+                                    <svg-icon icon-class="input" />
+                                  </template>
                                   新增项目
                                 </el-button>
                                 <el-button
                                   class="toolbar-action-btn toolbar-action-btn--experiment"
                                   type="primary"
-                                  icon="Plus"
                                   @click="handleAddExperiment"
                                   v-hasPermi="['data:info:addExperiment']"
                                 >
+                                  <template #icon>
+                                    <svg-icon icon-class="button" />
+                                  </template>
                                   新增试验
                                 </el-button>
                                 <el-button
                                   class="toolbar-action-btn toolbar-action-btn--import"
                                   type="primary"
-                                  icon="Upload"
                                   @click="openFileManager"
                                   v-hasPermi="['dataInfo:info:insert']"
                                 >
+                                  <template #icon>
+                                    <svg-icon icon-class="upload" />
+                                  </template>
                                   数据导入
                                 </el-button>
                                 <el-button
                                   class="toolbar-action-btn toolbar-action-btn--export"
                                   type="primary"
-                                  icon="Download"
                                   @click="handleExportData"
                                   v-hasPermi="['dataInfo:info:download']"
                                 >
+                                  <template #icon>
+                                    <svg-icon icon-class="download" />
+                                  </template>
                                   导出
                                 </el-button>
                                 <el-button

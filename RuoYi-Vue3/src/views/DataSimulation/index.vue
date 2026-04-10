@@ -61,7 +61,7 @@
       <template #header>
         <div class="toolbar">
           <div class="toolbar__left">
-            <el-button type="primary" icon="Plus" @click="openCreateDialog" v-hasPermi="['data:simulation:insert']">新增仿真任务</el-button>
+            <el-button type="primary" @click="openCreateDialog" v-hasPermi="['data:simulation:insert']"><svg-icon icon-class="button" /> 新增仿真任务</el-button>
             <el-button
               class="toolbar-delete-btn"
               type="danger"
