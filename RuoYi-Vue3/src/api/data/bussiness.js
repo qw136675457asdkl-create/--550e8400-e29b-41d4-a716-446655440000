@@ -1,11 +1,13 @@
 import request from '@/utils/request'
-//树形结构的实验项目列表
+
+// Tree data
 export function getExperimentList() {
   return request({
     url: '/data/bussiness/experimentInfoTree',
     method: 'get'
   })
 }
+
 export function getdataList(query) {
   return request({
     url: '/data/bussiness/datalist',
@@ -13,6 +15,7 @@ export function getdataList(query) {
     params: query
   })
 }
+
 export function getdataDetail(id) {
   return request({
     url: '/data/bussiness/' + id,
@@ -34,36 +37,34 @@ export function updatedata(data) {
     data: data
   })
 }
+
 export function deldata(ids) {
   return request({
-    url: '/data/bussiness/delete', 
+    url: '/data/bussiness/delete',
     method: 'delete',
     data: ids
   })
 }
 
-// 导入数据
-export function adddata(data, file) {
-  const formData = new FormData()
-  
-  // 添加文件
-  if (file) {
-    formData.append('file', file)
-  }
-  
-  // 直接将数据对象的属性添加到FormData，使后端能够接收到值
-  for (const key in data) {
-    if (data.hasOwnProperty(key)) {
-      formData.append(key, data[key])
-    }
-  }
-  
-  return request({
+// Upload business data
+export function adddata(data, config = {}) {
+  const requestConfig = {
     url: '/data/bussiness/insert',
     method: 'post',
-    data: formData,
-    headers: { 'Content-Type': 'multipart/form-data' }
-  })
+    data,
+    timeout: config.timeout ?? 6 * 60 * 60 * 1000,
+    ...config
+  }
+
+  if (data instanceof FormData) {
+    requestConfig.headers = {
+      'Content-Type': 'multipart/form-data',
+      repeatSubmit: false,
+      ...(config.headers || {})
+    }
+  }
+
+  return request(requestConfig)
 }
 
 export function previewData(data) {

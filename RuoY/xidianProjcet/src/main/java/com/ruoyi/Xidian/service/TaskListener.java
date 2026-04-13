@@ -365,7 +365,7 @@ public class TaskListener {
             }
             String suffix = sourceName.substring(sourceName.lastIndexOf("."));
             sourceName = sourceName.substring(0,sourceName.lastIndexOf("."));
-            Path targetFile = target.resolve(sourceName + "_" + UUID.randomUUID() + suffix);
+            Path targetFile = target.resolve(sourceName + suffix);
             Files.copy(source, targetFile, StandardCopyOption.REPLACE_EXISTING);
             return targetFile.getFileName().toString();
         }catch(Exception e) {

@@ -34,6 +34,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -107,10 +108,22 @@ public class DBussinessDataInfoController extends BaseController
     @PreAuthorize("@ss.hasPermi('dataInfo:info:insert')")
     @PostMapping("/insert")
     @Log(title = "导入业务数据", businessType = BusinessType.INSERT)
-    public AjaxResult insertDDataInfo(@ModelAttribute DdataInfo ddataInfo, @RequestParam("file") MultipartFile file)
+    public AjaxResult insertDDataInfo(
+            @ModelAttribute DdataInfo ddataInfo,
+            @RequestParam(value = "files", required = false) List<MultipartFile> files,
+            @RequestParam(value = "file", required = false) MultipartFile file)
     {
         try {
-            return AjaxResult.success(ddataService.insertDdataInfo(ddataInfo, file));
+            List<MultipartFile> uploadFiles = new ArrayList<>();
+            if (files != null && !files.isEmpty())
+            {
+                uploadFiles.addAll(files);
+            }
+            if (file != null && !file.isEmpty())
+            {
+                uploadFiles.add(file);
+            }
+            return AjaxResult.success(ddataService.insertDdataInfos(ddataInfo, uploadFiles));
         } catch (Exception e){
             return AjaxResult.error(e.getMessage());
         }

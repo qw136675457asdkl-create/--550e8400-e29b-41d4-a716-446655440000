@@ -824,7 +824,11 @@
                     <el-row>
                         <el-col :span="12">
                             <el-form-item label="数据名称" prop="dataName">
-                                <el-input v-model="uploadDataForm.dataName" placeholder="为空则使用文件名" />
+                                <el-input
+                                    v-model="uploadDataForm.dataName"
+                                    :disabled="businessDraftFiles.length > 0 && !businessSingleUploadNameEnabled"
+                                    :placeholder="businessDraftFiles.length === 0 || businessSingleUploadNameEnabled ? '为空则使用文件名' : '批量、文件夹或 ZIP 上传时按实际文件名入库'"
+                                />
                             </el-form-item>
                         </el-col>
                         <el-col :span="12">
@@ -862,6 +866,7 @@
                                     <el-option label="目标牵引与询问数据" value="目标牵引与询问数据"/>
                                     <el-option label="方位数据" value="方位数据"/>
                                     <el-option label="闭锁信息数据" value="闭锁信息数据"/>
+                                    <el-option label="其他元数据" value="其他元数据"/>
                                 </el-select>
                             </el-form-item>
                         </el-col>
@@ -878,12 +883,68 @@
                     </el-row>
                 </el-form>
 
-                <!-- 文件上传 -->
-                <el-divider>选择文件上传至当前文件夹</el-divider>
-                <el-upload drag action="" :auto-upload="false" :on-change="handleFileSelect" v-model:file-list="uploadFiles" class="import-upload">
+                <el-divider content-position="left">导入文件上传</el-divider>
+                <el-alert
+                    title="支持上传单个文件、多个文件、文件夹和 ZIP 压缩包；文件夹结构会保留，ZIP 会自动解压到当前试验目录。批量、文件夹和 ZIP 解压场景下将按实际文件名入库。"
+                    type="info"
+                    :closable="false"
+                    show-icon
+                    class="experiment-upload__alert"
+                />
+                <el-upload
+                    ref="businessUploadRef"
+                    drag
+                    action=""
+                    :auto-upload="false"
+                    :show-file-list="false"
+                    multiple
+                    :disabled="fileLoading"
+                    :accept="EXPERIMENT_UPLOAD_ACCEPT"
+                    class="experiment-upload"
+                    :on-change="handleBusinessDraftChange"
+                >
                     <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-                    <div class="el-upload__text">拖到此处或<em>点击选择文件</em></div>
+                    <div class="el-upload__text">拖拽导入文件到此处，或<em>点击选择文件</em></div>
+                    <template #tip>
+                        <div class="experiment-upload__tip">支持 ZIP、CSV、Excel、TXT、JSON、Word、PDF、BIN、DAT、RAW；如需上传整个文件夹，请使用下方“选择文件夹”。</div>
+                    </template>
                 </el-upload>
+                <input
+                    ref="businessFolderInputRef"
+                    class="experiment-upload__folder-input"
+                    type="file"
+                    webkitdirectory
+                    multiple
+                    :disabled="fileLoading"
+                    :accept="EXPERIMENT_UPLOAD_ACCEPT"
+                    @change="handleBusinessFolderChange"
+                />
+                <div class="experiment-upload__meta">
+                    <span class="experiment-upload__count">已选择 {{ businessDraftFiles.length }} 个待上传文件</span>
+                    <div class="experiment-upload__actions">
+                        <el-button link type="primary" :disabled="fileLoading" @click="openBusinessFolderPicker">
+                            <el-icon><ElIconFolder /></el-icon>
+                            <span>选择文件夹</span>
+                        </el-button>
+                        <el-button link type="primary" :disabled="!businessDraftFiles.length || fileLoading" @click="clearBusinessDraftFiles">清空文件</el-button>
+                    </div>
+                </div>
+                <div v-if="businessUploadProgress.visible" class="experiment-upload__progress">
+                    <div class="experiment-upload__progress-text">{{ businessUploadProgress.text }}</div>
+                    <el-progress :percentage="businessUploadProgress.percentage" :status="businessUploadProgress.status" :stroke-width="10" />
+                </div>
+                <div v-if="businessDraftFiles.length" class="experiment-upload__list">
+                    <div v-for="file in businessDraftFiles" :key="file.uid" class="experiment-upload__list-item">
+                        <div class="experiment-upload__list-main">
+                            <el-icon class="experiment-upload__list-icon"><ElIconDocument /></el-icon>
+                            <span class="experiment-upload__list-name" :title="file.name">{{ file.name }}</span>
+                        </div>
+                        <div class="experiment-upload__list-side">
+                            <span class="experiment-upload__list-size">{{ formatExperimentFileSize(file.size) }}</span>
+                            <el-button link type="danger" :disabled="fileLoading" @click="removeBusinessDraftFile(file.uid)">移除</el-button>
+                        </div>
+                    </div>
+                </div>
             </div>
             <template #footer>
                 <el-button @click="cancelUpload">取消</el-button>
@@ -1193,7 +1254,15 @@ const multiple = ref(true)
 // 文件管理器相关状态
 const fileLoading = ref(false)
 const importVisible = ref(false)
-const uploadFiles = ref([])
+const businessUploadRef = ref(null)
+const businessFolderInputRef = ref(null)
+const businessDraftFiles = ref([])
+const businessUploadProgress = reactive({
+  visible: false,
+  percentage: 0,
+  status: '',
+  text: ''
+})
 const experimentUploadRef = ref(null)
 const experimentFolderInputRef = ref(null)
 const experimentDraftFiles = ref([])
@@ -1208,6 +1277,7 @@ const uploadDataFormRef = ref(null)
 const EXPERIMENT_UPLOAD_ACCEPT = '.zip,.csv,.xls,.xlsx,.txt,.json,.doc,.docx,.pdf,.bin,.dat,.raw'
 const experimentAllowedExtensions = new Set(['zip', 'csv', 'xls', 'xlsx', 'txt', 'json', 'doc', 'docx', 'pdf', 'bin', 'dat', 'raw'])
 let experimentDraftUid = 0
+let businessDraftUid = 0
 
 // 详情预览相关状态
 const detailDialogRef = ref(null)
@@ -1320,6 +1390,7 @@ function openFileManager() {
   if (!treeTableOptions.value || treeTableOptions.value.length === 0) {
       getTreeData()
   }
+  resetUploadData()
   importVisible.value = true
   getInfo(null, 'experiment', { silent: true }).then(res => {
     targetTypeOptions.value = res.targetTypes || []
@@ -1665,6 +1736,108 @@ function formatExperimentFileSize(size) {
   return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GB`
 }
 
+function clearBusinessDraftFiles() {
+  businessDraftFiles.value = []
+  resetBusinessUploadProgress()
+  if (businessUploadRef.value) {
+    businessUploadRef.value.clearFiles()
+  }
+  resetBusinessFolderInput()
+}
+
+function removeBusinessDraftFile(uid) {
+  businessDraftFiles.value = businessDraftFiles.value.filter(item => item.uid !== uid)
+}
+
+function resetBusinessFolderInput() {
+  if (businessFolderInputRef.value) {
+    businessFolderInputRef.value.value = ''
+  }
+}
+
+function resetBusinessUploadProgress() {
+  businessUploadProgress.visible = false
+  businessUploadProgress.percentage = 0
+  businessUploadProgress.status = ''
+  businessUploadProgress.text = ''
+}
+
+function updateBusinessUploadProgress(event, fileCount) {
+  const total = Number(event?.total) || 0
+  if (!total) return
+  const loaded = Number(event?.loaded) || 0
+  const percentage = Math.min(99, Math.max(1, Math.round((loaded / total) * 100)))
+  businessUploadProgress.visible = true
+  businessUploadProgress.percentage = percentage
+  businessUploadProgress.status = ''
+  businessUploadProgress.text = `正在上传 ${fileCount} 个文件... ${percentage}%`
+}
+
+function createBusinessDraftFile(rawFile, relativePath) {
+  businessDraftUid += 1
+  return {
+    uid: `business-draft-${businessDraftUid}`,
+    name: relativePath,
+    size: Number(rawFile?.size) || 0,
+    status: 'ready',
+    raw: rawFile,
+    relativePath
+  }
+}
+
+function addBusinessDraftFiles(rawFiles = []) {
+  if (!Array.isArray(rawFiles) || rawFiles.length === 0) return
+
+  const existingKeys = new Set(
+    businessDraftFiles.value.map(item => buildExperimentDraftKey(item.raw, item.relativePath || item.name))
+  )
+  const nextFiles = []
+  const invalidFiles = []
+  const duplicateFiles = []
+
+  rawFiles.forEach(rawFile => {
+    if (!(rawFile instanceof File)) return
+    const relativePath = normalizeExperimentUploadPath(rawFile.webkitRelativePath || rawFile.name)
+    if (!relativePath || !isExperimentFileSupported(relativePath)) {
+      invalidFiles.push(rawFile.webkitRelativePath || rawFile.name || '未命名文件')
+      return
+    }
+    const draftKey = buildExperimentDraftKey(rawFile, relativePath)
+    if (existingKeys.has(draftKey)) {
+      duplicateFiles.push(relativePath)
+      return
+    }
+    existingKeys.add(draftKey)
+    nextFiles.push(createBusinessDraftFile(rawFile, relativePath))
+  })
+
+  if (nextFiles.length) {
+    businessDraftFiles.value = businessDraftFiles.value.concat(nextFiles)
+  }
+  if (invalidFiles.length) {
+    ElMessage.warning(`已跳过不支持的文件：${summarizeExperimentFileNames(invalidFiles)}`)
+  }
+  if (duplicateFiles.length) {
+    ElMessage.warning(`已忽略重复文件：${summarizeExperimentFileNames(duplicateFiles)}`)
+  }
+}
+
+function handleBusinessDraftChange(uploadFile) {
+  if (!uploadFile?.raw) return
+  addBusinessDraftFiles([uploadFile.raw])
+}
+
+function openBusinessFolderPicker() {
+  if (fileLoading.value) return
+  businessFolderInputRef.value?.click()
+}
+
+function handleBusinessFolderChange(event) {
+  const rawFiles = Array.from(event?.target?.files || [])
+  addBusinessDraftFiles(rawFiles)
+  resetBusinessFolderInput()
+}
+
 function buildExperimentInfoFormData(data) {
   const formData = new FormData()
 
@@ -1674,6 +1847,24 @@ function buildExperimentInfoFormData(data) {
   })
 
   experimentDraftFiles.value.forEach(file => {
+    if (!file?.raw) return
+    const relativePath = normalizeExperimentUploadPath(file.relativePath || file.name || file.raw.name)
+    formData.append('files', file.raw, relativePath || file.raw.name)
+    formData.append('relativePaths', relativePath || file.raw.name)
+  })
+
+  return formData
+}
+
+function buildBusinessUploadFormData(data) {
+  const formData = new FormData()
+
+  Object.entries(data || {}).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') return
+    formData.append(key, value)
+  })
+
+  businessDraftFiles.value.forEach(file => {
     if (!file?.raw) return
     const relativePath = normalizeExperimentUploadPath(file.relativePath || file.name || file.raw.name)
     formData.append('files', file.raw, relativePath || file.raw.name)
@@ -2407,6 +2598,19 @@ const selectableTreeOptions = computed(() => {
     return treeTableOptions.value ? disableProjects(treeTableOptions.value) : []
 })
 
+const businessSingleUploadNameEnabled = computed(() => {
+  if (businessDraftFiles.value.length !== 1) {
+    return false
+  }
+
+  const file = businessDraftFiles.value[0]
+  const relativePath = normalizeExperimentUploadPath(file?.relativePath || file?.name || '')
+  if (!relativePath || getExperimentFileExtension(relativePath) === 'zip') {
+    return false
+  }
+  return extractDirPath(`/${relativePath}`) === '/'
+})
+
 const resetUploadData = () => {
   uploadDataForm.dataName = ''
   uploadDataForm.experimentId = null
@@ -2414,13 +2618,11 @@ const resetUploadData = () => {
   uploadDataForm.targetType = null
   uploadDataForm.dataType = ''
   uploadDataForm.isSimulation = true
-  uploadFiles.value = []
+  clearBusinessDraftFiles()
+  fileLoading.value = false
   if (uploadDataFormRef.value) {
     uploadDataFormRef.value.resetFields()
   }
-}
-const handleFileSelect = () => {
-  // 文件选择后自动处理
 }
 
 /** 处理试验目标选择变化 - 获取对应的 targetType */
@@ -2434,35 +2636,48 @@ const cancelUpload = () => {
   importVisible.value = false
 }
 const submitUpload = async () => {
-  // 校验表单
-  if (!uploadDataFormRef.value) return
+  if (fileLoading.value || !uploadDataFormRef.value) return
   await uploadDataFormRef.value.validate(async (valid) => {
     if (!valid) return
 
-    if (uploadFiles.value.length === 0) {
+    const selectedFiles = businessDraftFiles.value.filter(file => file?.raw)
+    if (selectedFiles.length === 0) {
         ElMessage.warning('请选择要上传的文件')
         return
     }
 
+    fileLoading.value = true
+    resetBusinessUploadProgress()
+    businessUploadProgress.visible = true
+    businessUploadProgress.text = `准备上传 ${selectedFiles.length} 个文件...`
     try {
-        for (const file of uploadFiles.value) {
-            // 构建业务数据对象
-            const businessData = {
-                dataName: uploadDataForm.dataName || file.name,
-                experimentId: uploadDataForm.experimentId,
-                targetId: uploadDataForm.targetId,
-                dataType: uploadDataForm.dataType,
-                isSimulation: uploadDataForm.isSimulation
-            }
-
-            // 调用修改后的API，同时传递数据和文件
-            await adddata(businessData, file.raw)
+        const businessData = {
+          dataName: uploadDataForm.dataName,
+          experimentId: uploadDataForm.experimentId,
+          targetId: uploadDataForm.targetId,
+          targetType: uploadDataForm.targetType,
+          dataType: uploadDataForm.dataType,
+          isSimulation: uploadDataForm.isSimulation
         }
-        ElMessage.success('数据导入成功')
+        const formData = buildBusinessUploadFormData(businessData)
+        await adddata(formData, {
+          silent: true,
+          onUploadProgress: event => updateBusinessUploadProgress(event, selectedFiles.length)
+        })
+        businessUploadProgress.visible = true
+        businessUploadProgress.percentage = 100
+        businessUploadProgress.status = 'success'
+        businessUploadProgress.text = `上传完成，已处理 ${selectedFiles.length} 个文件`
+        proxy.$modal.msgSuccess(selectedFiles.length > 1 ? `成功导入 ${selectedFiles.length} 个文件` : '数据导入成功')
         importVisible.value = false
-        await getList() // 自动查询业务数据列表
-    } catch (err) {
-        console.error('导入失败: ' + (err.message || '未知错误'))
+        await getList()
+    } catch (error) {
+        businessUploadProgress.visible = true
+        businessUploadProgress.status = 'exception'
+        businessUploadProgress.text = error?.message || '上传失败，请重试'
+        showInfoRequestError(error, '数据导入失败')
+    } finally {
+        fileLoading.value = false
     }
   })
 }
