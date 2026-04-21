@@ -47,7 +47,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectSamePathExperiment" resultMap="DExperimentInfoResult">
         <include refid="selectDExperimentInfoVo"/>
-        where e.experiment_name = #{experimentName} AND e.projectId = #{projectId}
+        where e.experiment_name = #{experimentName} AND e.project_id = #{projectId}
     </select>
     
     <select id="selectDExperimentInfoByExperimentId" parameterType="String" resultMap="DExperimentInfoResult">

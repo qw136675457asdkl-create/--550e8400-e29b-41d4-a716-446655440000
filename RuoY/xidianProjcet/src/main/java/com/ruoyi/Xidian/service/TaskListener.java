@@ -3,13 +3,10 @@ package com.ruoyi.Xidian.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
-import com.ruoyi.Xidian.config.SimulationPythonProperties;
-import com.ruoyi.Xidian.domain.Attitude;
 import com.ruoyi.Xidian.domain.Coordinate;
+import com.ruoyi.Xidian.domain.DTO.TaskToPy;
 import com.ruoyi.Xidian.domain.Task;
 import com.ruoyi.Xidian.domain.TaskDataGroup;
-import com.ruoyi.Xidian.domain.Vector3;
-import com.ruoyi.Xidian.domain.DTO.TaskToPy;
 import com.ruoyi.Xidian.domain.enums.TaskStatusEnum;
 import com.ruoyi.Xidian.mapper.TaskDataGroupMapper;
 import com.ruoyi.Xidian.mapper.TaskMapper;
@@ -18,6 +15,8 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.framework.web.service.WebSocketServer;
 import com.ruoyi.system.service.ISysUserService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -26,7 +25,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -37,6 +35,7 @@ import java.util.stream.Stream;
 
 @Component
 public class TaskListener {
+    private static final Logger log = LoggerFactory.getLogger(TaskListener.class);
 
     @Autowired
     private TaskMapper taskMapper;
@@ -63,22 +62,34 @@ public class TaskListener {
     )
     public void handleTask(Task task, Channel channel, Message message) throws IOException {
         long deliveryTag = message.getMessageProperties().getDeliveryTag();
+        log.info("Received simulation task message, taskId={}, deliveryTag={}", task == null ? null : task.getId(), deliveryTag);
 
         Task currentTask = taskMapper.selectById(task.getId());
         if (currentTask == null || TaskStatusEnum.SUCCESS.toString().equals(currentTask.getStatus())) {
+            log.info("Task already completed or missing, ack directly, taskId={}, currentStatus={}",
+                    task == null ? null : task.getId(),
+                    currentTask == null ? null : currentTask.getStatus());
             channel.basicAck(deliveryTag, false);
             return;
         }
 
         try {
+            log.info("Start processing simulation task, taskId={}, taskCode={}, experimentId={}",
+                    task.getId(), task.getTaskCode(), task.getExperimentId());
             //更新任务状态
             task.setStatus(TaskStatusEnum.RUNNING.toString());
             task.setUpdateTime(new Date());
             taskMapper.update(task);
+            log.info("Task marked as RUNNING, taskId={}", task.getId());
             task.setDataGroups(taskDataGroupMapper.selectByTaskId(task.getId()));
+            log.info("Loaded task data groups, taskId={}, groupCount={}",
+                    task.getId(), task.getDataGroups() == null ? 0 : task.getDataGroups().size());
             TaskToPy taskToPy = buildPythonRequest(task, task.getDataGroups());
+            log.info("Built python request, taskId={}, requestId={}", task.getId(), taskToPy.getRequestId());
             JsonNode taskResponse = pythonSimulationService.submitAndWait(taskToPy);
+            log.info("Python simulation completed, taskId={}, response={}", task.getId(), taskResponse);
             String directory = getFilePath(taskResponse, "directory");
+            log.info("Python output directory resolved, taskId={}, directory={}", task.getId(), directory);
             List<String> storedFileNames = new ArrayList<>();
             String targetPath = dExperimentInfoService.getExperimentPath(task.getExperimentId());
             List<String> Filelists = new ArrayList<>();
@@ -90,10 +101,13 @@ public class TaskListener {
             }
             for (String sourceName : Filelists){
                 String sourceFile = directory + "/" +sourceName;
+                log.info("Copy simulation file, taskId={}, sourceFile={}, targetPath={}", task.getId(), sourceFile, targetPath);
                 storedFileNames.add(copyFile(sourceFile,targetPath,sourceName));
                 deleteFile(sourceFile);
             }
             deleteFile(directory);
+            log.info("Simulation files copied and source directory removed, taskId={}, copiedCount={}",
+                    task.getId(), storedFileNames.size());
             //将数据插入数据库
             iDdataService.syncSimulationResultFiles(
                     task.getExperimentId(),
@@ -102,15 +116,21 @@ public class TaskListener {
                     resolveSampleFrequency(task.getDataGroups()),
                     task.getCreateBy(),
                     task.getDataCategorySummary());
+            log.info("Simulation result files synced to database, taskId={}", task.getId());
 
             task.setStatus(TaskStatusEnum.SUCCESS.toString());
             task.setUpdateTime(new Date());
             taskMapper.update(task);
+            log.info("Task marked as SUCCESS, taskId={}", task.getId());
             notifyTaskSummaryIfCompleted(task.getId());
             channel.basicAck(deliveryTag, false);
+            log.info("Task processing completed and acknowledged, taskId={}", task.getId());
         } catch (Exception exception) {
+            log.error("Simulation task processing failed, taskId={}", task == null ? null : task.getId(), exception);
             int retryCount = getRetryCount(message);
+            log.warn("Simulation task retry count evaluated, taskId={}, retryCount={}", task == null ? null : task.getId(), retryCount);
             if (retryCount < 3) {
+                log.info("Retrying simulation task later, taskId={}", task == null ? null : task.getId());
                 channel.basicNack(deliveryTag, false, false);
             } else {
                 task.setStatus(TaskStatusEnum.FAILED.toString());
@@ -119,6 +139,7 @@ public class TaskListener {
                 taskDataGroupMapper.deleteByTaskId(task.getId());
                 rabbitTemplate.send("retry_exchange", "final_routing", message);
                 channel.basicAck(deliveryTag, false);
+                log.error("Simulation task reached max retry count and moved to final retry queue, taskId={}", task.getId());
             }
         }
     }
@@ -295,13 +316,16 @@ public class TaskListener {
             return;
         }
 
+        log.info("Notify task summary check started, taskId={}", taskId);
         Task task = taskMapper.selectById(taskId);
         if (task == null || StringUtils.isEmpty(task.getCreateBy())) {
+            log.info("Skip task summary notification because task or creator is missing, taskId={}", taskId);
             return;
         }
 
         SysUser user = sysUserService.selectUserByUserName(task.getCreateBy());
         if (user == null || user.getUserId() == null) {
+            log.info("Skip task summary notification because user is missing, taskId={}, createBy={}", taskId, task.getCreateBy());
             return;
         }
 
@@ -316,7 +340,9 @@ public class TaskListener {
 
         try {
             webSocketServer.sendText(user.getUserId(), objectMapper.writeValueAsString(payload));
+            log.info("Task summary notification sent, taskId={}, userId={}", taskId, user.getUserId());
         } catch (Exception ignored) {
+            log.warn("Task summary notification failed, taskId={}, userId={}", taskId, user.getUserId());
         }
     }
 

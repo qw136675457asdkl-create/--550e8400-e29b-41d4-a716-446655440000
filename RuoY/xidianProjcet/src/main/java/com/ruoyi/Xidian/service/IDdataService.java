@@ -19,6 +19,8 @@ public interface IDdataService {
 
     Integer insertDdataInfo(DdataInfo ddataInfo, MultipartFile file);
     Integer insertDdataInfos(DdataInfo ddataInfo, List<MultipartFile> files);
+    Integer insertDdataInfoByPath(DdataInfo ddataInfo);
+    Integer transportDdataFile(DdataInfo ddataInfo);
     Integer updateDdataInfo(DdataInfo ddataInfo);
 
     Integer deleteDdataInfos(List<Integer> ids);

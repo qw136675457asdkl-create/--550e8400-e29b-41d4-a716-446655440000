@@ -1,9 +1,6 @@
 package com.ruoyi.Xidian.domain.DTO;
 
-import com.ruoyi.Xidian.domain.Attitude;
 import com.ruoyi.Xidian.domain.Coordinate;
-import com.ruoyi.Xidian.domain.RandomSeeds;
-import com.ruoyi.Xidian.domain.Vector3;
 
 import java.util.List;
 

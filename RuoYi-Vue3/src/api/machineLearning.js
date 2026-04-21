@@ -1,5 +1,15 @@
 import request from '@/utils/request'
 
+const CODE_EXECUTOR_URLS = {
+  python: '/api/python/execute',
+  matlab: '/api/matlab/execute'
+}
+
+const CODE_EXECUTOR_TIMEOUTS = {
+  python: 60000,
+  matlab: 310000
+}
+
 // 保存机器学习环境配置
 export function saveMachineLearningConfiguration(data) {
   return request({
@@ -25,3 +35,25 @@ export function resetMachineLearningConfiguration() {
   })
 }
 
+function executeCode(language, code) {
+  return request({
+    url: CODE_EXECUTOR_URLS[language],
+    method: 'post',
+    data: {
+      code
+    },
+    timeout: CODE_EXECUTOR_TIMEOUTS[language] || 60000,
+    silent: true,
+    headers: {
+      repeatSubmit: false
+    }
+  })
+}
+
+export function executePythonCode(code) {
+  return executeCode('python', code)
+}
+
+export function executeMatlabCode(code) {
+  return executeCode('matlab', code)
+}

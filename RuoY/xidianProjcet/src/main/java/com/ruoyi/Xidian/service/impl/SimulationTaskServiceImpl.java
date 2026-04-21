@@ -15,6 +15,8 @@ import com.ruoyi.Xidian.service.SimulationTaskService;
 import com.ruoyi.Xidian.utils.NickNameUtil;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +25,7 @@ import java.util.stream.Collectors;
 
 @Service
 public class SimulationTaskServiceImpl implements SimulationTaskService {
+    private static final Logger log = LoggerFactory.getLogger(SimulationTaskServiceImpl.class);
     private static final String ROUTING_KEY = "simulation_task_routing";
     private static final String EXCHANGE_NAME = "simulation_task_exchange";
 
@@ -53,29 +56,46 @@ public class SimulationTaskServiceImpl implements SimulationTaskService {
 
     @Override
     public Task insert(TaskCreateRequest request) {
+        log.info("Start creating simulation task, taskName={}, experimentId={}, testId={}",
+                request == null ? null : request.getTaskName(),
+                request == null ? null : request.getExperimentId(),
+                request == null ? null : request.getTestId());
         if (!hasSubTaskConfig(request)) {
             throw new ServiceException("至少需要配置一个子任务");
         }
         Date now = new Date();
         Task task = buildTask(request, now);
+        log.info("Built main task entity, taskName={}, experimentId={}, taskCode={}",
+                task.getTaskName(), task.getExperimentId(), task.getTaskCode());
         taskMapper.insert(task);
+        log.info("Main task inserted, taskId={}", task.getId());
         if (task.getId() == null) {
             throw new ServiceException("主任务创建失败，未获取到任务ID");
         }
         List<TaskDataGroup> subTasks = buildSubTasks(task.getId(), request);
+        log.info("Built sub tasks, taskId={}, subTaskCount={}", task.getId(), subTasks.size());
         for (TaskDataGroup group : subTasks) {
+            log.info("Validating sub task before insert, taskId={}, groupName={}, dataName={}, outputType={}, targetNum={}",
+                    task.getId(), group.getGroupName(), group.getDataName(), group.getOutputType(), group.getTargetNum());
             if (dataMapper.selectSameNameFile(task.getExperimentId(),"/" + group.getDataName() + group.getOutputType()) != null){
+                log.warn("Duplicate data name detected, taskId={}, groupName={}, dataName={}, outputType={}",
+                        task.getId(), group.getGroupName(), group.getDataName(), group.getOutputType());
                 taskMapper.deleteById(task.getId());
                 throw new ServiceException(group.getGroupName() + "数据名称重复，请重新输入");
             }
             if (group.getTargetNum() < 3 && (Objects.equals(group.getDataName(), "radar_track") || Objects.equals(group.getDataName(), "ads_b"))){
+                log.warn("Target number validation failed, taskId={}, groupName={}, dataName={}, targetNum={}",
+                        task.getId(), group.getGroupName(), group.getDataName(), group.getTargetNum());
                 taskMapper.deleteById(task.getId());
                 throw new ServiceException("目标数量不少于三个");
             }
         }
         taskDataGroupMapper.batchInsert(subTasks);
+        log.info("Sub tasks batch inserted, taskId={}, subTaskCount={}", task.getId(), subTasks.size());
         task.setDataGroups(subTasks);
         rabbitTemplate.convertAndSend(EXCHANGE_NAME, ROUTING_KEY, task);
+        log.info("Simulation task sent to queue, taskId={}, routingKey={}, exchangeName={}",
+                task.getId(), ROUTING_KEY, EXCHANGE_NAME);
         return task;
     }
 

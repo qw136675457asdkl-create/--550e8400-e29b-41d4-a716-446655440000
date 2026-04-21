@@ -59,7 +59,7 @@ public class SysUserServiceImpl implements ISysUserService
      * @return 用户信息集合信息
      */
     @Override
-    @DataScope(deptAlias = "d", userAlias = "u")
+    //@DataScope(deptAlias = "d", userAlias = "u")
     public List<SysUser> selectUserList(SysUser user)
     {
         return userMapper.selectUserList(user);
@@ -72,7 +72,7 @@ public class SysUserServiceImpl implements ISysUserService
      * @return 用户信息集合信息
      */
     @Override
-    @DataScope(deptAlias = "d", userAlias = "u")
+    //@DataScope(deptAlias = "d", userAlias = "u")
     public List<SysUser> selectAllocatedList(SysUser user)
     {
         return userMapper.selectAllocatedList(user);
@@ -85,7 +85,7 @@ public class SysUserServiceImpl implements ISysUserService
      * @return 用户信息集合信息
      */
     @Override
-    @DataScope(deptAlias = "d", userAlias = "u")
+    //@DataScope(deptAlias = "d", userAlias = "u")
     public List<SysUser> selectUnallocatedList(SysUser user)
     {
         return userMapper.selectUnallocatedList(user);

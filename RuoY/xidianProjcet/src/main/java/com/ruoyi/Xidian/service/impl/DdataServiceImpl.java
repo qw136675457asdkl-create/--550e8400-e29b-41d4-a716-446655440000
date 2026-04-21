@@ -5,6 +5,8 @@ import com.ruoyi.Xidian.domain.DExperimentInfo;
 import com.ruoyi.Xidian.domain.DProjectInfo;
 import com.ruoyi.Xidian.domain.DdataInfo;
 import com.ruoyi.Xidian.mapper.*;
+import com.ruoyi.Xidian.service.IDExperimentInfoService;
+import com.ruoyi.Xidian.service.IDProjectInfoService;
 import com.ruoyi.Xidian.service.IDdataService;
 import com.ruoyi.Xidian.support.PathLockManager;
 import com.ruoyi.Xidian.utils.NickNameUtil;
@@ -14,6 +16,7 @@ import com.ruoyi.common.constant.CacheConstants;
 import com.ruoyi.common.core.redis.RedisCache;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.common.utils.uuid.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,6 +63,12 @@ public class DdataServiceImpl implements IDdataService
 
     @Autowired
     private BackDataMapper backDataMapper;
+
+    @Autowired
+    private IDProjectInfoService projectInfoService;
+
+    @Autowired
+    private IDExperimentInfoService dExperimentInfoService;
 
     private final String profile = RuoYiConfig.getProfile() + "/data";
     private final String backUPdir = RuoYiConfig.getBackupDir();
@@ -412,6 +421,296 @@ public class DdataServiceImpl implements IDdataService
             throw new ServiceException("文件上传失败");
         }
         return successCount;
+    }
+
+    @Override
+    public Integer insertDdataInfoByPath(DdataInfo ddataInfo)
+    {
+        if (ddataInfo == null)
+        {
+            throw new ServiceException("导入参数不能为空");
+        }
+
+        String projectName = normalizeOptionalText(ddataInfo.getProjectName());
+        String experimentName = normalizeOptionalText(ddataInfo.getExperimentName());
+        String dataName = normalizeOptionalText(ddataInfo.getDataName());
+        String dataType = normalizeOptionalText(ddataInfo.getDataType());
+        if (StringUtils.isEmpty(projectName)
+                || StringUtils.isEmpty(experimentName)
+                || StringUtils.isEmpty(dataName)
+                || StringUtils.isEmpty(dataType)
+                || StringUtils.isEmpty(ddataInfo.getDataFilePath()))
+        {
+            throw new ServiceException("项目名称、试验名称、数据名称、数据类型、数据路径不能为空");
+        }
+
+        DProjectInfo projectInfo = dProjectInfoMapper.selectSameNameProject(projectName);
+        if (projectInfo == null)
+        {
+            throw new ServiceException("项目不存在");
+        }
+
+        DExperimentInfo experimentInfo =
+                dExperimentInfoMapper.selectSamePathExperiment(experimentName, projectInfo.getProjectId());
+        if (experimentInfo == null)
+        {
+            throw new ServiceException("试验信息不存在");
+        }
+
+        String normalizedDataFilePath = normalizeDataFilePath(ddataInfo.getDataFilePath());
+        assertExperimentExtension(extractExtensionName(normalizedDataFilePath), normalizedDataFilePath);
+
+        Path projectRoot = buildProjectRootPath(projectInfo);
+        Path experimentRoot = buildExperimentRootPath(projectInfo, experimentInfo);
+        Path absolutePath = resolveAbsoluteDataPath(experimentRoot, normalizedDataFilePath);
+
+        try (PathLockManager.LockHandle ignored = pathLockManager.lockRead(projectRoot, experimentRoot, absolutePath))
+        {
+            if (Files.notExists(absolutePath) || Files.isDirectory(absolutePath))
+            {
+                throw new ServiceException("数据文件不存在");
+            }
+
+            DdataInfo insertDataInfo =
+                    buildBusinessPathImportDataInfo(ddataInfo, experimentInfo, normalizedDataFilePath);
+            DdataInfo oldInfo = ddataMapper.selectSameNameFile(experimentInfo.getExperimentId(), normalizedDataFilePath);
+            if (oldInfo != null)
+            {
+                mergeExistingDataInfo(insertDataInfo, oldInfo);
+                redisCache.deleteObject(CacheConstants.DATA_INFO_KEY + oldInfo.getId());
+                ddataMapper.updateDdataInfo(insertDataInfo);
+                return 1;
+            }
+
+            return ddataMapper.insertDdataInfo(insertDataInfo);
+        }
+    }
+
+    private DdataInfo buildBusinessPathImportDataInfo(
+            DdataInfo source,
+            DExperimentInfo experimentInfo,
+            String dataFilePath)
+    {
+        DdataInfo ddataInfo = new DdataInfo();
+        ddataInfo.setExperimentId(experimentInfo.getExperimentId());
+        ddataInfo.setTargetId(StringUtils.isNotEmpty(source.getTargetId())
+                ? normalizeOptionalText(source.getTargetId())
+                : experimentInfo.getTargetId());
+        ddataInfo.setTargetType(StringUtils.isNotEmpty(source.getTargetType())
+                ? normalizeOptionalText(source.getTargetType())
+                : resolveExperimentTargetType(experimentInfo));
+        ddataInfo.setTargetCategory(normalizeOptionalText(source.getTargetCategory()));
+        ddataInfo.setDataName(normalizeOptionalText(source.getDataName()));
+        ddataInfo.setDataType(normalizeOptionalText(source.getDataType()));
+        ddataInfo.setDataFilePath(dataFilePath);
+        ddataInfo.setDeviceId(normalizeOptionalText(source.getDeviceId()));
+        ddataInfo.setDeviceInfo(normalizeOptionalText(source.getDeviceInfo()));
+        ddataInfo.setSampleFrequency(source.getSampleFrequency() == null || source.getSampleFrequency() <= 0
+                ? 1000
+                : source.getSampleFrequency());
+        ddataInfo.setWorkStatus(StringUtils.isNotEmpty(source.getWorkStatus())
+                ? normalizeOptionalText(source.getWorkStatus())
+                : "completed");
+        ddataInfo.setExtAttr(source.getExtAttr());
+        ddataInfo.setIsSimulation(source.getIsSimulation() == null ? Boolean.TRUE : source.getIsSimulation());
+        ddataInfo.setCreateBy(StringUtils.isNotEmpty(source.getCreateBy())
+                ? normalizeOptionalText(source.getCreateBy())
+                : NickNameUtil.getNickName());
+        ddataInfo.setCreateTime(source.getCreateTime());
+        return ddataInfo;
+    }
+
+    @Override
+    public Integer transportDdataFile(DdataInfo ddataInfo)
+    {
+        if (ddataInfo == null)
+        {
+            throw new ServiceException("数据参数不能为空");
+        }
+
+        String projectName = ddataInfo.getProjectName() == null ? null : ddataInfo.getProjectName().trim();
+        String experimentName = ddataInfo.getExperimentName() == null ? null : ddataInfo.getExperimentName().trim();
+        String sourceFullPath = ddataInfo.getFullPath() == null ? null : ddataInfo.getFullPath().trim();
+        if (StringUtils.isEmpty(projectName)
+                || StringUtils.isEmpty(experimentName)
+                || StringUtils.isEmpty(sourceFullPath))
+        {
+            throw new ServiceException("项目名称、试验名称、源文件路径不能为空");
+        }
+
+        Path sourcePath = Paths.get(sourceFullPath).normalize();
+        if (Files.notExists(sourcePath) || Files.isDirectory(sourcePath))
+        {
+            throw new ServiceException("源数据文件不存在");
+        }
+
+        DProjectInfo projectInfo = ensureTransportProject(projectName);
+        DExperimentInfo experimentInfo = ensureTransportExperiment(projectInfo, experimentName, ddataInfo);
+
+        String sourceFileName = sourcePath.getFileName().toString();
+        if (StringUtils.isEmpty(sourceFileName))
+        {
+            throw new ServiceException("源数据文件名无效");
+        }
+
+        String requestedDataFilePath = StringUtils.isNotEmpty(ddataInfo.getDataFilePath())
+                ? normalizeDataFilePath(ddataInfo.getDataFilePath())
+                : buildImportedDataFilePath(sourceFileName);
+
+        Path projectRoot = buildProjectRootPath(projectInfo);
+        Path experimentRoot = buildExperimentRootPath(projectInfo, experimentInfo);
+        String storagePath = resolveAvailableExperimentStoragePath(
+                experimentInfo.getExperimentId(),
+                experimentRoot,
+                requestedDataFilePath
+        );
+        Path targetPath = resolveAbsoluteDataPath(experimentRoot, storagePath);
+
+        try (PathLockManager.LockHandle ignored = pathLockManager.lock(
+                buildLockPaths(projectRoot, experimentRoot, sourcePath),
+                buildLockPaths(targetPath)))
+        {
+            if (Files.notExists(sourcePath) || Files.isDirectory(sourcePath))
+            {
+                throw new ServiceException("源数据文件不存在");
+            }
+
+            Path targetParent = targetPath.getParent();
+            if (targetParent != null && Files.notExists(targetParent))
+            {
+                Files.createDirectories(targetParent);
+            }
+
+            Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+        }
+        catch (IOException e)
+        {
+            throw new ServiceException("搬运数据文件失败: " + e.getMessage());
+        }
+
+        DdataInfo insertDataInfo = buildTransportDataInfo(
+                ddataInfo,
+                experimentInfo,
+                storagePath,
+                sourceFileName
+        );
+        return ddataMapper.insertDdataInfo(insertDataInfo);
+    }
+
+    private DProjectInfo ensureTransportProject(String projectName)
+    {
+        DProjectInfo projectInfo = dProjectInfoMapper.selectSameNameProject(projectName);
+        if (projectInfo != null)
+        {
+            return projectInfo;
+        }
+
+        Path projectRoot = Paths.get(
+                profile,
+                StringUtils.removeStart("/" + projectName, "/")
+        ).normalize();
+        DProjectInfo newProjectInfo = new DProjectInfo();
+        newProjectInfo.setProjectName(projectName);
+        newProjectInfo.setCreateBy(NickNameUtil.getNickName());
+        newProjectInfo.setPath("/" + projectName);
+        if (Files.exists(projectRoot))
+        {
+            dProjectInfoMapper.insertDProjectInfo(newProjectInfo);
+        }
+        else
+        {
+            projectInfoService.insertDProjectInfo(newProjectInfo);
+        }
+
+        DProjectInfo createdProjectInfo = dProjectInfoMapper.selectSameNameProject(projectName);
+        if (createdProjectInfo == null)
+        {
+            throw new ServiceException("项目创建失败");
+        }
+        return createdProjectInfo;
+    }
+
+    private DExperimentInfo ensureTransportExperiment(
+            DProjectInfo projectInfo,
+            String experimentName,
+            DdataInfo source)
+    {
+        DExperimentInfo experimentInfo =
+                dExperimentInfoMapper.selectSamePathExperiment(experimentName, projectInfo.getProjectId());
+        if (experimentInfo != null)
+        {
+            return experimentInfo;
+        }
+
+        Path experimentRoot = Paths.get(
+                profile,
+                StringUtils.removeStart(projectInfo.getPath(), "/"),
+                StringUtils.removeStart("/" + experimentName, "/")
+        ).normalize();
+        DExperimentInfo newExperimentInfo = new DExperimentInfo();
+        newExperimentInfo.setExperimentId(UUID.randomUUID().toString());
+        newExperimentInfo.setTargetId(source.getTargetId());
+        newExperimentInfo.setExperimentName(experimentName);
+        newExperimentInfo.setProjectId(projectInfo.getProjectId());
+        newExperimentInfo.setStartTime(new Date());
+        newExperimentInfo.setCreateBy(StringUtils.isNotEmpty(source.getCreateBy())
+                ? source.getCreateBy().trim()
+                : NickNameUtil.getNickName());
+        newExperimentInfo.setPath("/" + experimentName);
+        if (Files.exists(experimentRoot))
+        {
+            dExperimentInfoMapper.insertDExperimentInfo(newExperimentInfo);
+        }
+        else
+        {
+            dExperimentInfoService.insertDExperimentInfo(newExperimentInfo);
+        }
+
+        DExperimentInfo createdExperimentInfo =
+                dExperimentInfoMapper.selectSamePathExperiment(experimentName, projectInfo.getProjectId());
+        if (createdExperimentInfo == null)
+        {
+            throw new ServiceException("试验创建失败");
+        }
+        return createdExperimentInfo;
+    }
+
+    private DdataInfo buildTransportDataInfo(
+            DdataInfo source,
+            DExperimentInfo experimentInfo,
+            String dataFilePath,
+            String sourceFileName)
+    {
+        DdataInfo ddataInfo = new DdataInfo();
+        ddataInfo.setExperimentId(experimentInfo.getExperimentId());
+        ddataInfo.setTargetId(StringUtils.isNotEmpty(source.getTargetId())
+                ? source.getTargetId().trim()
+                : experimentInfo.getTargetId());
+        ddataInfo.setTargetType(StringUtils.isNotEmpty(source.getTargetType())
+                ? source.getTargetType().trim()
+                : resolveExperimentTargetType(experimentInfo));
+        ddataInfo.setTargetCategory(source.getTargetCategory());
+        ddataInfo.setDataName(StringUtils.isNotEmpty(source.getDataName())
+                ? source.getDataName().trim()
+                : sourceFileName);
+        ddataInfo.setDataType(StringUtils.isNotEmpty(source.getDataType())
+                ? source.getDataType().trim()
+                : resolveExperimentDataType(dataFilePath));
+        ddataInfo.setDataFilePath(dataFilePath);
+        ddataInfo.setDeviceId(source.getDeviceId());
+        ddataInfo.setDeviceInfo(source.getDeviceInfo());
+        ddataInfo.setSampleFrequency(source.getSampleFrequency() == null || source.getSampleFrequency() <= 0
+                ? 1000
+                : source.getSampleFrequency());
+        ddataInfo.setWorkStatus(StringUtils.isNotEmpty(source.getWorkStatus())
+                ? source.getWorkStatus().trim()
+                : "completed");
+        ddataInfo.setExtAttr(source.getExtAttr());
+        ddataInfo.setIsSimulation(source.getIsSimulation() == null ? Boolean.TRUE : source.getIsSimulation());
+        ddataInfo.setCreateBy(StringUtils.isNotEmpty(source.getCreateBy())
+                ? source.getCreateBy().trim()
+                : NickNameUtil.getNickName());
+        return ddataInfo;
     }
 
     private int uploadBusinessZipArchive(MultipartFile file, DdataInfo ddataInfo, String archivePath)
@@ -924,6 +1223,7 @@ public class DdataServiceImpl implements IDdataService
             }
             //已经备份后除非还原否则不可再备份
             if(isDataFileHasBackup(id)){
+                log.warn("备份失败，该数据已经备份,id={}", id);
                 return 0;
             }
             Files.copy(sourcePath,targetPath,StandardCopyOption.REPLACE_EXISTING);
@@ -951,9 +1251,6 @@ public class DdataServiceImpl implements IDdataService
         if(backupData == null || Integer.valueOf(1).equals(backupData.getIsRestored())){
             return "请选择需要恢复的数据";
         }
-        if(ddataMapper.selectDdataInfoById(backupData.getDataInfoId())!=null){
-
-        }
         if (StringUtils.isEmpty(backupData.getProjectName())
                 || StringUtils.isEmpty(backupData.getExperimentName())
                 || StringUtils.isEmpty(backupData.getExperimentId())
@@ -968,9 +1265,42 @@ public class DdataServiceImpl implements IDdataService
                 backupData.getProjectName(),
                 backupData.getExperimentName()
         ).normalize();
-        if(Files.notExists(experimentRoot)){
-            return "数据所属试验已被删除，请重建试验目录";
-        }
+//        if(Files.notExists(experimentRoot)){
+//            DProjectInfo dProjectInfo = new DProjectInfo();
+//            //试验不存在新建试验，若项目不存在则新建项目
+//            if(Files.notExists(experimentRoot.getParent())){
+//                dProjectInfo.setProjectName(backupData.getProjectName());
+//                dProjectInfo.setCreateBy(NickNameUtil.getNickName());
+//                dProjectInfo.setPath("/" + backupData.getProjectName());
+//                projectInfoService.insertDProjectInfo(dProjectInfo);
+//            } else {
+//                //检查当前存在的项目是否为之前的项目，否则更新项目
+//                Long currentProjectId = dProjectInfoMapper.selectSameNameProject(backupData.getProjectName()).getProjectId();
+//                if(!Objects.equals(currentProjectId, backupData.getProjectId())){
+//                    backupData.setProjectId(currentProjectId);
+//                }
+//            }
+//            DExperimentInfo dExperimentInfo = new DExperimentInfo();
+//            dExperimentInfo.setExperimentId(UUID.randomUUID().toString());
+//            dExperimentInfo.setTargetId(backupData.getTargetId());
+//            dExperimentInfo.setExperimentName(backupData.getExperimentName());
+//            dExperimentInfo.setProjectId(backupData.getProjectId());
+//            dExperimentInfo.setStartTime(new Date());
+//            dExperimentInfo.setCreateBy(NickNameUtil.getNickName());
+//            dExperimentInfo.setPath("/" + dExperimentInfo.getExperimentName());
+//            dExperimentInfoService.insertDExperimentInfo(dExperimentInfo);
+//            backupData.setProjectId(dProjectInfo.getProjectId());
+//            backupData.setExperimentId(dExperimentInfo.getExperimentId());
+//            backDataMapper.updateBackupData(backupData);
+//        } else{
+//            Long currentProjectId = dProjectInfoMapper.selectSameNameProject(backupData.getProjectName()).getProjectId();
+//            //检查当前存在的试验
+//            String currentExperimentId = dExperimentInfoMapper.selectSamePathExperiment(backupData.getExperimentName(),
+//                    currentProjectId).getExperimentId();
+//            if(!Objects.equals(currentExperimentId, backupData.getExperimentId()))
+//                backupData.setExperimentId(currentExperimentId);
+//            backDataMapper.updateBackupData(backupData);
+//        }
         String restoredDataFilePath = resolveAvailableExperimentStoragePath(
                 backupData.getExperimentId(),
                 experimentRoot,
@@ -984,7 +1314,40 @@ public class DdataServiceImpl implements IDdataService
                 return "文件恢复失败，源文件不存在或不是文件";
             }
             if (targetParent != null && Files.notExists(targetParent)) {
-                return "数据文件所属试验被删除，请重建该试验";
+                DProjectInfo dProjectInfo = new DProjectInfo();
+                //试验不存在新建试验，若项目不存在则新建项目
+                if(Files.notExists(experimentRoot.getParent())){
+                    dProjectInfo.setProjectName(backupData.getProjectName());
+                    dProjectInfo.setCreateBy(NickNameUtil.getNickName());
+                    dProjectInfo.setPath("/" + backupData.getProjectName());
+                    projectInfoService.insertDProjectInfo(dProjectInfo);
+                } else {
+                    //检查当前存在的项目是否为之前的项目，否则更新项目
+                    Long currentProjectId = dProjectInfoMapper.selectSameNameProject(backupData.getProjectName()).getProjectId();
+                    if(!Objects.equals(currentProjectId, backupData.getProjectId())){
+                        backupData.setProjectId(currentProjectId);
+                    }
+                }
+                DExperimentInfo dExperimentInfo = new DExperimentInfo();
+                dExperimentInfo.setExperimentId(UUID.randomUUID().toString());
+                dExperimentInfo.setTargetId(backupData.getTargetId());
+                dExperimentInfo.setExperimentName(backupData.getExperimentName());
+                dExperimentInfo.setProjectId(backupData.getProjectId());
+                dExperimentInfo.setStartTime(new Date());
+                dExperimentInfo.setCreateBy(NickNameUtil.getNickName());
+                dExperimentInfo.setPath("/" + dExperimentInfo.getExperimentName());
+                dExperimentInfoService.insertDExperimentInfo(dExperimentInfo);
+                backupData.setProjectId(dProjectInfo.getProjectId());
+                backupData.setExperimentId(dExperimentInfo.getExperimentId());
+                backDataMapper.updateBackupData(backupData);
+            }else{
+                Long currentProjectId = dProjectInfoMapper.selectSameNameProject(backupData.getProjectName()).getProjectId();
+                //检查当前存在的试验
+                String currentExperimentId = dExperimentInfoMapper.selectSamePathExperiment(backupData.getExperimentName(),
+                        currentProjectId).getExperimentId();
+                if(!Objects.equals(currentExperimentId, backupData.getExperimentId()))
+                    backupData.setExperimentId(currentExperimentId);
+                backDataMapper.updateBackupData(backupData);
             }
             if (!restoredDataFilePath.equals(normalizedSourcePath)) {
                 log.info("恢复文件重名，自动调整存储路径，backupId={}, oldPath={}, newPath={}",
@@ -1349,6 +1712,16 @@ public class DdataServiceImpl implements IDdataService
             return resolvedDataType;
         }
         return "simulation";
+    }
+
+    private String normalizeOptionalText(String value)
+    {
+        if (value == null)
+        {
+            return null;
+        }
+        String normalized = value.trim();
+        return normalized.isEmpty() ? null : normalized;
     }
 
     private String normalizeFileName(String fileName, String fallbackDataPath)

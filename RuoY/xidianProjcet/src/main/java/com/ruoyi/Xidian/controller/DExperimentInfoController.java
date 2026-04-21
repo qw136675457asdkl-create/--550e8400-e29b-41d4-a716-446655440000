@@ -271,7 +271,7 @@ public class DExperimentInfoController extends BaseController
                 dProjectInfo.setProjectName(treeTableVo.getName());
                 dProjectInfo.setCreateTime(treeTableVo.getCreateTime());
                 dProjectInfo.setProjectContentDesc(treeTableVo.getContentDesc());
-                dProjectInfo.setPath(treeTableVo.getPath());
+                dProjectInfo.setPath("/" + treeTableVo.getName());
                 return toAjax(dProjectInfoService.updateDProjectInfo(dProjectInfo));
             }
             catch (Exception e)
@@ -289,7 +289,7 @@ public class DExperimentInfoController extends BaseController
         dExperimentInfo.setCreateTime(treeTableVo.getCreateTime());
         dExperimentInfo.setContentDesc(treeTableVo.getContentDesc());
         dExperimentInfo.setStartTime(treeTableVo.getStartTime());
-        dExperimentInfo.setPath(treeTableVo.getPath());
+        dExperimentInfo.setPath("/" + treeTableVo.getName());
         try
         {
             return toAjax(dExperimentInfoService.updateDExperimentInfo(dExperimentInfo));

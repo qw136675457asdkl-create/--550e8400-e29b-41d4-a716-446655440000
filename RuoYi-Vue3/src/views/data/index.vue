@@ -1006,8 +1006,10 @@ async function handleRestoreBackupRecord(row) {
     const response = await restoreBackupData(backupId, { silent: true })
     if (response?.code === 200) {
       proxy.$modal.msgSuccess(response?.msg || '还原成功')
-      await getBackupList()
-      getList()
+      await Promise.all([
+        getBackupList(),
+        getList()
+      ])
       return
     }
 

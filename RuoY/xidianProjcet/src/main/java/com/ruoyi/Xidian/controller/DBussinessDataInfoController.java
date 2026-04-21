@@ -129,6 +129,35 @@ public class DBussinessDataInfoController extends BaseController
         }
     }
 
+    @PostMapping("/insertByPath")
+    @Log(title = "业务数据路径导入", businessType = BusinessType.INSERT)
+    public AjaxResult insertDDataInfoByPath(@RequestBody DdataInfo ddataInfo)
+    {
+        try
+        {
+            return AjaxResult.success(ddataService.insertDdataInfoByPath(ddataInfo));
+        }
+        catch (Exception e)
+        {
+            return AjaxResult.error(e.getMessage());
+        }
+    }
+
+    @PreAuthorize("@ss.hasPermi('dataInfo:info:insert')")
+    @PostMapping("/transport")
+    @Log(title = "业务数据文件搬运", businessType = BusinessType.INSERT)
+    public AjaxResult transportDDataFile(@RequestBody DdataInfo ddataInfo)
+    {
+        try
+        {
+            return AjaxResult.success(ddataService.transportDdataFile(ddataInfo));
+        }
+        catch (Exception e)
+        {
+            return AjaxResult.error(e.getMessage());
+        }
+    }
+
     @PreAuthorize("@ss.hasPermi('dataInfo:info:update')")
     @PutMapping("/update")
     @Log(title = "更新业务数据", businessType = BusinessType.UPDATE)
@@ -225,6 +254,56 @@ public class DBussinessDataInfoController extends BaseController
         {
             Map<String, Object> previewData =
                     FileUtils.previewFileByPage(absolutePath.toString(), pageNum, pageSize);
+            return success(previewData);
+        }
+    }
+
+    @PreAuthorize("@ss.hasPermi('dataInfo:info:preview')")
+    @PostMapping("/previewAll")
+    public AjaxResult previewAllDDataInfo(@RequestBody DdataInfo ddataInfo)
+    {
+        if (StringUtils.isEmpty(ddataInfo.getExperimentId()) || StringUtils.isEmpty(ddataInfo.getDataFilePath()))
+        {
+            throw new ServiceException("预览参数不能为空");
+        }
+        DExperimentInfo experimentInfo = new DExperimentInfo();
+        try {
+            experimentInfo =
+                dExperimentInfoService.selectDExperimentInfoByExperimentId(ddataInfo.getExperimentId());
+        }
+        catch (Exception e) {
+            throw new ServiceException("查询试验信息失败");
+        }
+        if (experimentInfo == null)
+        {
+            throw new ServiceException("试验信息不存在");
+        }
+
+        DProjectInfo projectInfo = new DProjectInfo();
+        try {
+            projectInfo =
+                dProjectInfoService.selectDProjectInfoByProjectId(experimentInfo.getProjectId());
+        }
+        catch (Exception e) {
+            throw new ServiceException("查询项目信息失败");
+        }
+        if (projectInfo == null)
+        {
+            throw new ServiceException("项目不存在");
+        }
+
+        String relativePath = StringUtils.removeStart(ddataInfo.getDataFilePath(), "/");
+        Path projectRoot = buildProjectRoot(projectInfo.getPath());
+        Path experimentRoot = buildExperimentRoot(projectInfo.getPath(), experimentInfo.getPath());
+        Path absolutePath = resolveDataFilePath(experimentRoot, relativePath);
+
+        try (PathLockManager.LockHandle ignored = pathLockManager.lockRead(projectRoot, experimentRoot, absolutePath))
+        {
+            Map<String, Object> previewData =
+                    FileUtils.previewFileByPage(absolutePath.toString(), 1, Integer.MAX_VALUE);
+            Object total = previewData.get("total");
+            previewData.put("pageNum", 1);
+            previewData.put("pageSize", total == null ? 0 : total);
             return success(previewData);
         }
     }

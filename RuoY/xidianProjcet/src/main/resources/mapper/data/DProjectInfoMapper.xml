@@ -54,7 +54,7 @@
         </foreach>
     </select>
 
-    <insert id="insertDProjectInfo" parameterType="DProjectInfo">
+    <insert id="insertDProjectInfo" parameterType="DProjectInfo" useGeneratedKeys="true" keyProperty="projectId" keyColumn="PROJECT_ID">
         insert into SYSTEM_COLLABORATION_TEST.d_project_info
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="projectName != null and projectName != ''">project_name,</if>

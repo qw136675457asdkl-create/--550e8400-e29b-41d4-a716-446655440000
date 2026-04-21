@@ -21,9 +21,9 @@
         <el-table-column label="数据名称" align="center" prop="dataName" min-width="170" :show-overflow-tooltip="true" />
         <el-table-column label="是否模拟" align="center" prop="isSimulation" min-width="130">
           <template #default="scope">
-            <el-tag class="status-chip" effect="light" round :type="scope.row.isSimulation === true ? 'success' : scope.row.isSimulation === false ? 'warning' : 'info'">
-              <span v-if="scope.row.isSimulation === true">真实数据</span>
-              <span v-else-if="scope.row.isSimulation === false">模拟数据</span>
+            <el-tag class="status-chip" effect="light" round :type="scope.row.isSimulation === true ? 'warning' : scope.row.isSimulation === false ? 'warning' : 'info'">
+              <span v-if="scope.row.isSimulation === true">仿真</span>
+              <span v-else-if="scope.row.isSimulation === false">模拟</span>
               <span v-else>未知类型</span>
             </el-tag>
           </template>
