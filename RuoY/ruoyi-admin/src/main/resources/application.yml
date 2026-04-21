@@ -180,3 +180,18 @@ simulation:
     local-data-root: ${SIMULATION_PYTHON_LOCAL_DATA_ROOT:${ruoyi.profile}/data}
     output-base-dir: ${SIMULATION_PYTHON_OUTPUT_BASE_DIR:${ruoyi.profile}/data}
     default-output-directory: ${SIMULATION_PYTHON_DEFAULT_OUTPUT_DIRECTORY:csv_output/api_requests}
+  task:
+    stream:
+      task-stream-key: ${SIMULATION_TASK_STREAM_KEY:simulation_task_queue}
+      retry-stream-key: ${SIMULATION_TASK_RETRY_STREAM_KEY:simulation_task_retry_queue}
+      final-stream-key: ${SIMULATION_TASK_FINAL_STREAM_KEY:final_queue}
+      consumer-group: ${SIMULATION_TASK_STREAM_GROUP:simulation_task_group}
+      consumer-count: ${SIMULATION_TASK_STREAM_CONSUMER_COUNT:4}
+      max-retry-count: ${SIMULATION_TASK_STREAM_MAX_RETRY_COUNT:3}
+      retry-delay-millis: ${SIMULATION_TASK_STREAM_RETRY_DELAY_MILLIS:10000}
+      read-block-timeout-millis: ${SIMULATION_TASK_STREAM_READ_BLOCK_TIMEOUT_MILLIS:2000}
+      worker-error-backoff-millis: ${SIMULATION_TASK_STREAM_WORKER_ERROR_BACKOFF_MILLIS:2000}
+      retry-dispatch-interval-millis: ${SIMULATION_TASK_STREAM_RETRY_DISPATCH_INTERVAL_MILLIS:1000}
+      retry-dispatch-batch-size: ${SIMULATION_TASK_STREAM_RETRY_DISPATCH_BATCH_SIZE:20}
+      retry-dispatch-lock-key: ${SIMULATION_TASK_STREAM_RETRY_DISPATCH_LOCK_KEY:simulation_task_retry_dispatch_lock}
+      retry-dispatch-lock-millis: ${SIMULATION_TASK_STREAM_RETRY_DISPATCH_LOCK_MILLIS:5000}

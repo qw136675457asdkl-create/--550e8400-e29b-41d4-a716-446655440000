@@ -2,7 +2,7 @@ package com.ruoyi.Xidian.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rabbitmq.client.Channel;
+import com.ruoyi.Xidian.config.SimulationTaskStreamProperties;
 import com.ruoyi.Xidian.domain.Coordinate;
 import com.ruoyi.Xidian.domain.DTO.TaskToPy;
 import com.ruoyi.Xidian.domain.Task;
@@ -17,32 +17,46 @@ import com.ruoyi.framework.web.service.WebSocketServer;
 import com.ruoyi.system.service.ISysUserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.amqp.core.Message;
-import org.springframework.amqp.core.MessageProperties;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.SmartLifecycle;
+import org.springframework.data.redis.connection.stream.MapRecord;
+import org.springframework.data.redis.connection.stream.RecordId;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.Resource;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.rmi.ServerException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
 @Component
-public class TaskListener {
+public class TaskListener implements SmartLifecycle
+{
     private static final Logger log = LoggerFactory.getLogger(TaskListener.class);
 
     @Autowired
     private TaskMapper taskMapper;
     @Autowired
     private TaskDataGroupMapper taskDataGroupMapper;
-    @Autowired
-    private RabbitTemplate rabbitTemplate;
     @Autowired
     private IDExperimentInfoService dExperimentInfoService;
     @Autowired
@@ -55,96 +69,405 @@ public class TaskListener {
     private ISysUserService sysUserService;
     @Autowired
     private ObjectMapper objectMapper;
+    @Autowired
+    private SimulationTaskStreamQueue simulationTaskStreamQueue;
+    @Autowired
+    private SimulationTaskStreamProperties streamProperties;
 
-    @RabbitListener(
-            queues = "simulation_task_queue",
-            containerFactory = "simulationTaskListenerContainerFactory"
-    )
-    public void handleTask(Task task, Channel channel, Message message) throws IOException {
-        long deliveryTag = message.getMessageProperties().getDeliveryTag();
-        log.info("Received simulation task message, taskId={}, deliveryTag={}", task == null ? null : task.getId(), deliveryTag);
+    @Resource(name = "threadPoolTaskExecutor")
+    private ThreadPoolTaskExecutor threadPoolTaskExecutor;
 
-        Task currentTask = taskMapper.selectById(task.getId());
-        if (currentTask == null || TaskStatusEnum.SUCCESS.toString().equals(currentTask.getStatus())) {
-            log.info("Task already completed or missing, ack directly, taskId={}, currentStatus={}",
-                    task == null ? null : task.getId(),
-                    currentTask == null ? null : currentTask.getStatus());
-            channel.basicAck(deliveryTag, false);
+    @Resource(name = "scheduledExecutorService")
+    private ScheduledExecutorService scheduledExecutorService;
+
+    @Value("${server.port:8081}")
+    private String serverPort;
+
+    private final AtomicBoolean running = new AtomicBoolean(false);
+    private final List<Future<?>> workerFutures = new CopyOnWriteArrayList<>();
+    private volatile ScheduledFuture<?> retryDispatcherFuture;
+    private volatile String instanceId = "unknown";
+
+    @Override
+    public void start()
+    {
+        if (!running.compareAndSet(false, true))
+        {
             return;
         }
 
-        try {
-            log.info("Start processing simulation task, taskId={}, taskCode={}, experimentId={}",
-                    task.getId(), task.getTaskCode(), task.getExperimentId());
-            //更新任务状态
-            task.setStatus(TaskStatusEnum.RUNNING.toString());
-            task.setUpdateTime(new Date());
-            taskMapper.update(task);
-            log.info("Task marked as RUNNING, taskId={}", task.getId());
-            task.setDataGroups(taskDataGroupMapper.selectByTaskId(task.getId()));
-            log.info("Loaded task data groups, taskId={}, groupCount={}",
-                    task.getId(), task.getDataGroups() == null ? 0 : task.getDataGroups().size());
-            TaskToPy taskToPy = buildPythonRequest(task, task.getDataGroups());
-            log.info("Built python request, taskId={}, requestId={}", task.getId(), taskToPy.getRequestId());
-            JsonNode taskResponse = pythonSimulationService.submitAndWait(taskToPy);
-            log.info("Python simulation completed, taskId={}, response={}", task.getId(), taskResponse);
-            String directory = getFilePath(taskResponse, "directory");
-            log.info("Python output directory resolved, taskId={}, directory={}", task.getId(), directory);
-            List<String> storedFileNames = new ArrayList<>();
-            String targetPath = dExperimentInfoService.getExperimentPath(task.getExperimentId());
-            List<String> Filelists = new ArrayList<>();
-            //获取仿真的数据文件路径
-            try (Stream<Path> stream = Files.list(Paths.get(directory)))
-            {
-                stream.filter(Files::isRegularFile)
-                        .forEach(path -> Filelists.add(path.getFileName().toString()));
-            }
-            for (String sourceName : Filelists){
-                String sourceFile = directory + "/" +sourceName;
-                log.info("Copy simulation file, taskId={}, sourceFile={}, targetPath={}", task.getId(), sourceFile, targetPath);
-                storedFileNames.add(copyFile(sourceFile,targetPath,sourceName));
-                deleteFile(sourceFile);
-            }
-            deleteFile(directory);
-            log.info("Simulation files copied and source directory removed, taskId={}, copiedCount={}",
-                    task.getId(), storedFileNames.size());
-            //将数据插入数据库
-            iDdataService.syncSimulationResultFiles(
-                    task.getExperimentId(),
-                    storedFileNames,
-                    Filelists,
-                    resolveSampleFrequency(task.getDataGroups()),
-                    task.getCreateBy(),
-                    task.getDataCategorySummary());
-            log.info("Simulation result files synced to database, taskId={}", task.getId());
+        instanceId = resolveInstanceId();
+        simulationTaskStreamQueue.initialize();
+        startTaskWorkers();
+        startRetryDispatcher();
+        log.info("Simulation task stream consumer started, instanceId={}, consumerGroup={}, consumerCount={}",
+                instanceId,
+                streamProperties.getConsumerGroup(),
+                streamProperties.getConsumerCount());
+    }
 
-            task.setStatus(TaskStatusEnum.SUCCESS.toString());
-            task.setUpdateTime(new Date());
-            taskMapper.update(task);
-            log.info("Task marked as SUCCESS, taskId={}", task.getId());
-            notifyTaskSummaryIfCompleted(task.getId());
-            channel.basicAck(deliveryTag, false);
-            log.info("Task processing completed and acknowledged, taskId={}", task.getId());
-        } catch (Exception exception) {
-            log.error("Simulation task processing failed, taskId={}", task == null ? null : task.getId(), exception);
-            int retryCount = getRetryCount(message);
-            log.warn("Simulation task retry count evaluated, taskId={}, retryCount={}", task == null ? null : task.getId(), retryCount);
-            if (retryCount < 3) {
-                log.info("Retrying simulation task later, taskId={}", task == null ? null : task.getId());
-                channel.basicNack(deliveryTag, false, false);
-            } else {
-                task.setStatus(TaskStatusEnum.FAILED.toString());
-                notifyTaskSummaryIfCompleted(task.getId());
-                taskMapper.update(task);
-                taskDataGroupMapper.deleteByTaskId(task.getId());
-                rabbitTemplate.send("retry_exchange", "final_routing", message);
-                channel.basicAck(deliveryTag, false);
-                log.error("Simulation task reached max retry count and moved to final retry queue, taskId={}", task.getId());
-            }
+    @Override
+    public void stop()
+    {
+        if (!running.compareAndSet(true, false))
+        {
+            return;
+        }
+
+        ScheduledFuture<?> currentRetryDispatcherFuture = retryDispatcherFuture;
+        if (currentRetryDispatcherFuture != null)
+        {
+            currentRetryDispatcherFuture.cancel(true);
+            retryDispatcherFuture = null;
+        }
+
+        for (Future<?> workerFuture : workerFutures)
+        {
+            workerFuture.cancel(true);
+        }
+        workerFutures.clear();
+        log.info("Simulation task stream consumer stopped, instanceId={}", instanceId);
+    }
+
+    @Override
+    public void stop(Runnable callback)
+    {
+        try
+        {
+            stop();
+        }
+        finally
+        {
+            callback.run();
         }
     }
 
-    private TaskToPy buildPythonRequest(Task task, List<TaskDataGroup> taskDataGroups) {
+    @Override
+    public boolean isRunning()
+    {
+        return running.get();
+    }
+
+    @Override
+    public boolean isAutoStartup()
+    {
+        return true;
+    }
+
+    @Override
+    public int getPhase()
+    {
+        return Integer.MAX_VALUE;
+    }
+
+    private void startTaskWorkers()
+    {
+        for (int workerIndex = 1; workerIndex <= streamProperties.getConsumerCount(); workerIndex++)
+        {
+            String consumerName = buildConsumerName(workerIndex);
+            workerFutures.add(threadPoolTaskExecutor.submit(() -> consumeLoop(consumerName)));
+        }
+    }
+
+    private void startRetryDispatcher()
+    {
+        retryDispatcherFuture = scheduledExecutorService.scheduleWithFixedDelay(
+                this::dispatchRetryTasksSafely,
+                streamProperties.getRetryDispatchIntervalMillis(),
+                streamProperties.getRetryDispatchIntervalMillis(),
+                TimeUnit.MILLISECONDS);
+    }
+
+    private void consumeLoop(String consumerName)
+    {
+        log.info("Simulation task worker started, consumerName={}", consumerName);
+        while (running.get() && !Thread.currentThread().isInterrupted())
+        {
+            try
+            {
+                List<MapRecord<String, Object, Object>> records = simulationTaskStreamQueue.readPendingTaskRecords(consumerName, 1);
+                if (records.isEmpty())
+                {
+                    records = simulationTaskStreamQueue.readNewTaskRecords(consumerName, 1);
+                }
+                if (records.isEmpty())
+                {
+                    continue;
+                }
+
+                for (MapRecord<String, Object, Object> record : records)
+                {
+                    handleTaskRecord(consumerName, record);
+                }
+            }
+            catch (Exception exception)
+            {
+                if (!running.get() || Thread.currentThread().isInterrupted())
+                {
+                    break;
+                }
+                log.error("Simulation task worker loop failed, consumerName={}", consumerName, exception);
+                sleepQuietly(streamProperties.getWorkerErrorBackoffMillis());
+            }
+        }
+        log.info("Simulation task worker stopped, consumerName={}", consumerName);
+    }
+
+    private void handleTaskRecord(String consumerName, MapRecord<String, Object, Object> record)
+    {
+        Task task;
+        int retryCount;
+        try
+        {
+            task = simulationTaskStreamQueue.readTask(record);
+            retryCount = simulationTaskStreamQueue.readRetryCount(record);
+        }
+        catch (Exception exception)
+        {
+            log.error("Failed to deserialize simulation task stream message, recordId={}, consumerName={}",
+                    record.getId(), consumerName, exception);
+            acknowledgeAndDeleteTaskRecord(record);
+            return;
+        }
+
+        log.info("Received simulation task stream message, taskId={}, recordId={}, consumerName={}, retryCount={}",
+                task == null ? null : task.getId(),
+                record.getId(),
+                consumerName,
+                retryCount);
+
+        if (task == null || task.getId() == null)
+        {
+            log.warn("Skip simulation task stream message because task payload is empty, recordId={}, consumerName={}",
+                    record.getId(), consumerName);
+            acknowledgeAndDeleteTaskRecord(record);
+            return;
+        }
+
+        Task currentTask = taskMapper.selectById(task.getId());
+        if (currentTask == null || TaskStatusEnum.SUCCESS.toString().equals(currentTask.getStatus()))
+        {
+            log.info("Task already completed or missing, ack directly, taskId={}, currentStatus={}, recordId={}",
+                    task.getId(),
+                    currentTask == null ? null : currentTask.getStatus(),
+                    record.getId());
+            acknowledgeAndDeleteTaskRecord(record);
+            return;
+        }
+
+        try
+        {
+            processTask(task);
+            acknowledgeAndDeleteTaskRecord(record);
+            log.info("Task processing completed and acknowledged, taskId={}, recordId={}", task.getId(), record.getId());
+        }
+        catch (Exception exception)
+        {
+            onTaskProcessingFailure(task, retryCount, record, exception);
+        }
+    }
+
+    private void processTask(Task task) throws IOException
+    {
+        log.info("Start processing simulation task, taskId={}, taskCode={}, experimentId={}",
+                task.getId(), task.getTaskCode(), task.getExperimentId());
+        task.setStatus(TaskStatusEnum.RUNNING.toString());
+        task.setUpdateTime(new Date());
+        taskMapper.update(task);
+        log.info("Task marked as RUNNING, taskId={}", task.getId());
+
+        task.setDataGroups(taskDataGroupMapper.selectByTaskId(task.getId()));
+        log.info("Loaded task data groups, taskId={}, groupCount={}",
+                task.getId(), task.getDataGroups() == null ? 0 : task.getDataGroups().size());
+
+        TaskToPy taskToPy = buildPythonRequest(task, task.getDataGroups());
+        log.info("Built python request, taskId={}, requestId={}", task.getId(), taskToPy.getRequestId());
+
+        JsonNode taskResponse = pythonSimulationService.submitAndWait(taskToPy);
+        log.info("Python simulation completed, taskId={}, response={}", task.getId(), taskResponse);
+
+        String directory = getFilePath(taskResponse, "directory");
+        log.info("Python output directory resolved, taskId={}, directory={}", task.getId(), directory);
+
+        List<String> storedFileNames = new ArrayList<>();
+        String targetPath = dExperimentInfoService.getExperimentPath(task.getExperimentId());
+        List<String> fileLists = new ArrayList<>();
+        try (Stream<Path> stream = Files.list(Paths.get(directory)))
+        {
+            stream.filter(Files::isRegularFile)
+                    .forEach(path -> fileLists.add(path.getFileName().toString()));
+        }
+
+        for (String sourceName : fileLists)
+        {
+            String sourceFile = directory + "/" + sourceName;
+            log.info("Copy simulation file, taskId={}, sourceFile={}, targetPath={}", task.getId(), sourceFile, targetPath);
+            storedFileNames.add(copyFile(sourceFile, targetPath, sourceName));
+            deleteFile(sourceFile);
+        }
+        deleteFile(directory);
+        log.info("Simulation files copied and source directory removed, taskId={}, copiedCount={}",
+                task.getId(), storedFileNames.size());
+
+        iDdataService.syncSimulationResultFiles(
+                task.getExperimentId(),
+                storedFileNames,
+                fileLists,
+                resolveSampleFrequency(task.getDataGroups()),
+                task.getCreateBy(),
+                task.getDataCategorySummary());
+        log.info("Simulation result files synced to database, taskId={}", task.getId());
+
+        task.setStatus(TaskStatusEnum.SUCCESS.toString());
+        task.setUpdateTime(new Date());
+        taskMapper.update(task);
+        log.info("Task marked as SUCCESS, taskId={}", task.getId());
+
+        notifyTaskSummaryIfCompleted(task.getId());
+    }
+
+    private void onTaskProcessingFailure(
+            Task task,
+            int retryCount,
+            MapRecord<String, Object, Object> record,
+            Exception exception
+    )
+    {
+        log.error("Simulation task processing failed, taskId={}, recordId={}, retryCount={}",
+                task == null ? null : task.getId(),
+                record == null ? null : record.getId(),
+                retryCount,
+                exception);
+
+        if (retryCount < streamProperties.getMaxRetryCount())
+        {
+            int nextRetryCount = retryCount + 1;
+            simulationTaskStreamQueue.scheduleRetry(task, nextRetryCount, exception.getMessage());
+            acknowledgeAndDeleteTaskRecord(record);
+            log.warn("Simulation task scheduled to retry later, taskId={}, recordId={}, nextRetryCount={}",
+                    task == null ? null : task.getId(),
+                    record == null ? null : record.getId(),
+                    nextRetryCount);
+            return;
+        }
+
+        task.setStatus(TaskStatusEnum.FAILED.toString());
+        task.setUpdateTime(new Date());
+        notifyTaskSummaryIfCompleted(task.getId());
+        taskMapper.update(task);
+        taskDataGroupMapper.deleteByTaskId(task.getId());
+        simulationTaskStreamQueue.moveToFinalQueue(task, retryCount, exception.getMessage());
+        acknowledgeAndDeleteTaskRecord(record);
+        log.error("Simulation task reached max retry count and moved to final stream, taskId={}, recordId={}, retryCount={}",
+                task.getId(),
+                record.getId(),
+                retryCount);
+    }
+
+    private void dispatchRetryTasksSafely()
+    {
+        if (!running.get())
+        {
+            return;
+        }
+
+        if (!simulationTaskStreamQueue.tryAcquireRetryDispatchLock(instanceId))
+        {
+            return;
+        }
+
+        try
+        {
+            long now = System.currentTimeMillis();
+            List<MapRecord<String, Object, Object>> retryRecords =
+                    simulationTaskStreamQueue.readRetryRecords(streamProperties.getRetryDispatchBatchSize());
+
+            for (MapRecord<String, Object, Object> retryRecord : retryRecords)
+            {
+                long nextRetryAt;
+                try
+                {
+                    nextRetryAt = simulationTaskStreamQueue.readNextRetryAt(retryRecord);
+                }
+                catch (Exception exception)
+                {
+                    log.error("Invalid retry stream message, deleting record, retryRecordId={}", retryRecord.getId(), exception);
+                    simulationTaskStreamQueue.deleteRetryRecord(retryRecord.getId());
+                    continue;
+                }
+
+                if (nextRetryAt > now)
+                {
+                    break;
+                }
+
+                simulationTaskStreamQueue.moveRetryRecordToTaskStream(retryRecord);
+                log.info("Retry task moved back to task stream, retryRecordId={}, nextRetryAt={}",
+                        retryRecord.getId(), nextRetryAt);
+            }
+        }
+        catch (Exception exception)
+        {
+            if (running.get())
+            {
+                log.error("Simulation task retry dispatcher failed, instanceId={}", instanceId, exception);
+            }
+        }
+        finally
+        {
+            simulationTaskStreamQueue.releaseRetryDispatchLock(instanceId);
+        }
+    }
+
+    private void acknowledgeAndDeleteTaskRecord(MapRecord<String, Object, Object> record)
+    {
+        RecordId recordId = record.getId();
+        simulationTaskStreamQueue.acknowledgeTaskRecord(recordId);
+        try
+        {
+            simulationTaskStreamQueue.deleteTaskRecord(recordId);
+        }
+        catch (Exception exception)
+        {
+            log.warn("Failed to delete acknowledged task stream record, recordId={}", recordId, exception);
+        }
+    }
+
+    private String buildConsumerName(int workerIndex)
+    {
+        return instanceId + "-simulation-worker-" + workerIndex;
+    }
+
+    private String resolveInstanceId()
+    {
+        try
+        {
+            return InetAddress.getLocalHost().getHostName() + "-" + serverPort;
+        }
+        catch (Exception ignored)
+        {
+            return "localhost-" + serverPort;
+        }
+    }
+
+    private void sleepQuietly(long millis)
+    {
+        if (millis <= 0)
+        {
+            return;
+        }
+        try
+        {
+            Thread.sleep(millis);
+        }
+        catch (InterruptedException ignored)
+        {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private TaskToPy buildPythonRequest(Task task, List<TaskDataGroup> taskDataGroups)
+    {
         TaskToPy taskToPy = new TaskToPy();
         taskToPy.setRequestId(resolveRequestId(task));
         taskToPy.setBasic(buildBasicConfig(task));
@@ -152,7 +475,8 @@ public class TaskListener {
         return taskToPy;
     }
 
-    private TaskToPy.BasicConfig buildBasicConfig(Task task) {
+    private TaskToPy.BasicConfig buildBasicConfig(Task task)
+    {
         TaskToPy.BasicConfig basicConfig = new TaskToPy.BasicConfig();
         basicConfig.setMotionModel(resolveHostTrajectoryType(task.getMotionModel()));
         basicConfig.setStartCoords(requireCoordinate(task.getStartCoordinate(), "start coordinate"));
@@ -160,31 +484,37 @@ public class TaskListener {
         return basicConfig;
     }
 
-    private Map<String, TaskToPy.DatasetConfig> buildDatasetConfigs(List<TaskDataGroup> taskDataGroups) {
+    private Map<String, TaskToPy.DatasetConfig> buildDatasetConfigs(List<TaskDataGroup> taskDataGroups)
+    {
         List<TaskDataGroup> groups = requireTaskDataGroups(taskDataGroups);
         List<TaskDataGroup> sortedGroups = new ArrayList<>(groups);
         sortedGroups.sort(Comparator
                 .comparing(TaskListener::resolveSortNoOrderValue)
                 .thenComparing(TaskDataGroup::getId, Comparator.nullsLast(Long::compareTo)));
         Map<String, TaskToPy.DatasetConfig> datasets = new LinkedHashMap<>();
-        for (TaskDataGroup taskDataGroup : sortedGroups) {
+        for (TaskDataGroup taskDataGroup : sortedGroups)
+        {
             String datasetKey = resolveDatasetKey(taskDataGroup);
             TaskToPy.DatasetConfig previous = datasets.put(datasetKey, buildDatasetConfig(taskDataGroup, datasetKey));
-            if (previous != null) {
+            if (previous != null)
+            {
                 throw new ServiceException("duplicate dataset key: " + datasetKey);
             }
         }
         return datasets;
     }
 
-    private static Integer resolveSortNoOrderValue(TaskDataGroup taskDataGroup) {
-        if (taskDataGroup == null || taskDataGroup.getSortNo() == null) {
+    private static Integer resolveSortNoOrderValue(TaskDataGroup taskDataGroup)
+    {
+        if (taskDataGroup == null || taskDataGroup.getSortNo() == null)
+        {
             return Integer.MAX_VALUE;
         }
         return taskDataGroup.getSortNo();
     }
 
-    private TaskToPy.DatasetConfig buildDatasetConfig(TaskDataGroup taskDataGroup, String datasetKey) {
+    private TaskToPy.DatasetConfig buildDatasetConfig(TaskDataGroup taskDataGroup, String datasetKey)
+    {
         TaskToPy.DatasetConfig datasetConfig = new TaskToPy.DatasetConfig();
         datasetConfig.setEnabled(Boolean.TRUE);
         datasetConfig.setFilename(buildDatasetFilename(taskDataGroup));
@@ -195,31 +525,39 @@ public class TaskListener {
         return datasetConfig;
     }
 
-    private List<TaskDataGroup> requireTaskDataGroups(List<TaskDataGroup> taskDataGroups) {
-        if (taskDataGroups == null || taskDataGroups.isEmpty()) {
+    private List<TaskDataGroup> requireTaskDataGroups(List<TaskDataGroup> taskDataGroups)
+    {
+        if (taskDataGroups == null || taskDataGroups.isEmpty())
+        {
             throw new ServiceException("task data groups are required");
         }
         return taskDataGroups;
     }
 
-    private String resolveRequestId(Task task) {
-        if (StringUtils.isNotEmpty(task.getTaskCode())) {
+    private String resolveRequestId(Task task)
+    {
+        if (StringUtils.isNotEmpty(task.getTaskCode()))
+        {
             return task.getTaskCode().trim();
         }
-        if (task.getId() != null) {
+        if (task.getId() != null)
+        {
             return "task-" + task.getId();
         }
         throw new ServiceException("task code is required");
     }
 
-    private String resolveDatasetKey(TaskDataGroup taskDataGroup) {
-        if (StringUtils.isNotEmpty(taskDataGroup.getGroupName())) {
+    private String resolveDatasetKey(TaskDataGroup taskDataGroup)
+    {
+        if (StringUtils.isNotEmpty(taskDataGroup.getGroupName()))
+        {
             return taskDataGroup.getGroupName().trim();
         }
         return requireText(taskDataGroup.getDataName(), "dataset key");
     }
 
-    private String buildDatasetFilename(TaskDataGroup taskDataGroup) {
+    private String buildDatasetFilename(TaskDataGroup taskDataGroup)
+    {
         String dataName = requireText(taskDataGroup.getDataName(), "dataset data name");
         String outputType = requireText(taskDataGroup.getOutputType(), "dataset output type");
         String normalizedOutputType = outputType.startsWith(".")
@@ -227,18 +565,22 @@ public class TaskListener {
                 : outputType.trim();
         String lowerCaseFileName = dataName.toLowerCase(Locale.ROOT);
         String lowerCaseSuffix = "." + normalizedOutputType.toLowerCase(Locale.ROOT);
-        if (lowerCaseFileName.endsWith(lowerCaseSuffix)) {
+        if (lowerCaseFileName.endsWith(lowerCaseSuffix))
+        {
             return dataName;
         }
         return dataName + "." + normalizedOutputType;
     }
 
-    private void applyTargetNum(TaskToPy.DatasetConfig datasetConfig, String datasetKey, Integer targetNum) {
-        if (targetNum == null) {
+    private void applyTargetNum(TaskToPy.DatasetConfig datasetConfig, String datasetKey, Integer targetNum)
+    {
+        if (targetNum == null)
+        {
             return;
         }
 
-        switch (datasetKey.toLowerCase(Locale.ROOT)) {
+        switch (datasetKey.toLowerCase(Locale.ROOT))
+        {
             case "radar_track":
                 datasetConfig.setEnemyNum(targetNum);
                 break;
@@ -252,40 +594,51 @@ public class TaskListener {
         }
     }
 
-    private String requireText(String value, String fieldName) {
-        if (StringUtils.isEmpty(value) || StringUtils.isEmpty(value.trim())) {
+    private String requireText(String value, String fieldName)
+    {
+        if (StringUtils.isEmpty(value) || StringUtils.isEmpty(value.trim()))
+        {
             throw new ServiceException(fieldName + " is required");
         }
         return value.trim();
     }
 
-    private Coordinate requireCoordinate(Coordinate coordinate, String fieldName) {
-        if (coordinate == null) {
+    private Coordinate requireCoordinate(Coordinate coordinate, String fieldName)
+    {
+        if (coordinate == null)
+        {
             throw new ServiceException(fieldName + " is required");
         }
         return coordinate;
     }
 
-    private Date requireDate(Long epochMillis, String fieldName) {
-        if (epochMillis == null) {
+    private Date requireDate(Long epochMillis, String fieldName)
+    {
+        if (epochMillis == null)
+        {
             throw new ServiceException(fieldName + " is required");
         }
         return new Date(epochMillis);
     }
 
-    private <T> T requireValue(T value, String fieldName) {
-        if (value == null) {
+    private <T> T requireValue(T value, String fieldName)
+    {
+        if (value == null)
+        {
             throw new ServiceException(fieldName + " is required");
         }
         return value;
     }
 
-    private String resolveHostTrajectoryType(String motionModel) {
-        if (StringUtils.isEmpty(motionModel)) {
+    private String resolveHostTrajectoryType(String motionModel)
+    {
+        if (StringUtils.isEmpty(motionModel))
+        {
             return "cubic";
         }
 
-        switch (motionModel.trim()) {
+        switch (motionModel.trim())
+        {
             case "\u76f4\u7ebf\u6a21\u578b":
             case "LINEAR":
                 return "straight";
@@ -311,20 +664,24 @@ public class TaskListener {
         }
     }
 
-    private void notifyTaskSummaryIfCompleted(Long taskId) {
-        if (taskId == null) {
+    private void notifyTaskSummaryIfCompleted(Long taskId)
+    {
+        if (taskId == null)
+        {
             return;
         }
 
         log.info("Notify task summary check started, taskId={}", taskId);
         Task task = taskMapper.selectById(taskId);
-        if (task == null || StringUtils.isEmpty(task.getCreateBy())) {
+        if (task == null || StringUtils.isEmpty(task.getCreateBy()))
+        {
             log.info("Skip task summary notification because task or creator is missing, taskId={}", taskId);
             return;
         }
 
         SysUser user = sysUserService.selectUserByUserName(task.getCreateBy());
-        if (user == null || user.getUserId() == null) {
+        if (user == null || user.getUserId() == null)
+        {
             log.info("Skip task summary notification because user is missing, taskId={}, createBy={}", taskId, task.getCreateBy());
             return;
         }
@@ -338,86 +695,76 @@ public class TaskListener {
                 "\u4efb\u52a1\"%s\"\u5df2\u5b8c\u6210",
                 task.getTaskName()));
 
-        try {
+        try
+        {
             webSocketServer.sendText(user.getUserId(), objectMapper.writeValueAsString(payload));
             log.info("Task summary notification sent, taskId={}, userId={}", taskId, user.getUserId());
-        } catch (Exception ignored) {
+        }
+        catch (Exception ignored)
+        {
             log.warn("Task summary notification failed, taskId={}, userId={}", taskId, user.getUserId());
         }
     }
 
-    public int getRetryCount(Message message) {
-        MessageProperties properties = message.getMessageProperties();
-        Map<String, Object> headers = properties.getHeaders();
-        Object xDeath = headers.get("x-death");
-        if (xDeath instanceof List) {
-            for (Object item : (List<?>) xDeath) {
-                if (!(item instanceof Map)) {
-                    continue;
-                }
-                Map<?, ?> deathInfo = (Map<?, ?>) item;
-                Object queue = deathInfo.get("queue");
-                if (!"simulation_task_queue".equals(String.valueOf(queue))) {
-                    continue;
-                }
-                Object count = deathInfo.get("count");
-                if (count instanceof Number) {
-                    return ((Number) count).intValue();
-                }
-            }
-        }
-
-        Object retryCount = headers.get("retry-count");
-        if (retryCount instanceof Number) {
-            return ((Number) retryCount).intValue();
-        }
-        return 0;
-    }
-
-    private String getFilePath(JsonNode taskResponse, String fileKey) {
+    private String getFilePath(JsonNode taskResponse, String fileKey)
+    {
         JsonNode filesNode = taskResponse.path("files");
         return filesNode.path(fileKey).asText(null);
     }
 
-    private String copyFile(String sourcePath , String targetDir ,String sourceName) throws IOException {
+    private String copyFile(String sourcePath, String targetDir, String sourceName) throws IOException
+    {
         Path source = Paths.get(sourcePath);
         Path target = Paths.get(targetDir);
-        try {
-            if(!Files.exists(source)){
-                throw new ServerException("源文件不存在");
+        try
+        {
+            if (!Files.exists(source))
+            {
+                throw new ServerException("source file does not exist");
             }
-            if (!Files.exists(target)) {
+            if (!Files.exists(target))
+            {
                 Files.createDirectories(target);
             }
             String suffix = sourceName.substring(sourceName.lastIndexOf("."));
-            sourceName = sourceName.substring(0,sourceName.lastIndexOf("."));
+            sourceName = sourceName.substring(0, sourceName.lastIndexOf("."));
             Path targetFile = target.resolve(sourceName + suffix);
             Files.copy(source, targetFile, StandardCopyOption.REPLACE_EXISTING);
             return targetFile.getFileName().toString();
-        }catch(Exception e) {
-            throw new ServerException("文件导入失败");
+        }
+        catch (Exception exception)
+        {
+            throw new ServerException("failed to import file");
         }
     }
 
-    private Integer resolveSampleFrequency(List<TaskDataGroup> taskDataGroups) {
-        if (taskDataGroups == null || taskDataGroups.isEmpty()) {
+    private Integer resolveSampleFrequency(List<TaskDataGroup> taskDataGroups)
+    {
+        if (taskDataGroups == null || taskDataGroups.isEmpty())
+        {
             return null;
         }
 
-        for (TaskDataGroup taskDataGroup : taskDataGroups) {
-            if (taskDataGroup != null && taskDataGroup.getFrequencyHz() != null) {
+        for (TaskDataGroup taskDataGroup : taskDataGroups)
+        {
+            if (taskDataGroup != null && taskDataGroup.getFrequencyHz() != null)
+            {
                 return taskDataGroup.getFrequencyHz().intValue();
             }
         }
         return null;
     }
 
-    private void deleteFile(String path) throws IOException {
+    private void deleteFile(String path) throws IOException
+    {
         Path path1 = Paths.get(path);
-        try {
+        try
+        {
             Files.deleteIfExists(path1);
-        }catch (Exception e){
-            throw new ServerException("文件删除失败");
+        }
+        catch (Exception exception)
+        {
+            throw new ServerException("failed to delete file");
         }
     }
 }

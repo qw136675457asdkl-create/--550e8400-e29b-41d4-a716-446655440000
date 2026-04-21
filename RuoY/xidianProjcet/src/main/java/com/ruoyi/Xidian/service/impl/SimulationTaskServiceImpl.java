@@ -12,115 +12,135 @@ import com.ruoyi.Xidian.mapper.DdataMapper;
 import com.ruoyi.Xidian.mapper.TaskDataGroupMapper;
 import com.ruoyi.Xidian.mapper.TaskMapper;
 import com.ruoyi.Xidian.service.SimulationTaskService;
+import com.ruoyi.Xidian.service.SimulationTaskStreamQueue;
 import com.ruoyi.Xidian.utils.NickNameUtil;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
-public class SimulationTaskServiceImpl implements SimulationTaskService {
+public class SimulationTaskServiceImpl implements SimulationTaskService
+{
     private static final Logger log = LoggerFactory.getLogger(SimulationTaskServiceImpl.class);
-    private static final String ROUTING_KEY = "simulation_task_routing";
-    private static final String EXCHANGE_NAME = "simulation_task_exchange";
 
     private final TaskMapper taskMapper;
     private final TaskDataGroupMapper taskDataGroupMapper;
     private final DExperimentInfoServiceImpl dExperimentInfoService;
-    private final RabbitTemplate rabbitTemplate;
+    private final SimulationTaskStreamQueue simulationTaskStreamQueue;
     private final DdataMapper dataMapper;
 
     public SimulationTaskServiceImpl(
             TaskMapper taskMapper,
             TaskDataGroupMapper taskDataGroupMapper,
             DExperimentInfoServiceImpl dExperimentInfoService,
-            RabbitTemplate rabbitTemplate,
+            SimulationTaskStreamQueue simulationTaskStreamQueue,
             DdataMapper dataMapper
-    ) {
+    )
+    {
         this.taskMapper = taskMapper;
         this.taskDataGroupMapper = taskDataGroupMapper;
         this.dExperimentInfoService = dExperimentInfoService;
-        this.rabbitTemplate = rabbitTemplate;
+        this.simulationTaskStreamQueue = simulationTaskStreamQueue;
         this.dataMapper = dataMapper;
     }
 
     @Override
-    public List<Task> selectList() {
+    public List<Task> selectList()
+    {
         return taskMapper.selectList();
     }
 
     @Override
-    public Task insert(TaskCreateRequest request) {
+    public Task insert(TaskCreateRequest request)
+    {
         log.info("Start creating simulation task, taskName={}, experimentId={}, testId={}",
                 request == null ? null : request.getTaskName(),
                 request == null ? null : request.getExperimentId(),
                 request == null ? null : request.getTestId());
-        if (!hasSubTaskConfig(request)) {
-            throw new ServiceException("至少需要配置一个子任务");
+        if (!hasSubTaskConfig(request))
+        {
+            throw new ServiceException("at least one sub task is required");
         }
+
         Date now = new Date();
         Task task = buildTask(request, now);
         log.info("Built main task entity, taskName={}, experimentId={}, taskCode={}",
                 task.getTaskName(), task.getExperimentId(), task.getTaskCode());
         taskMapper.insert(task);
         log.info("Main task inserted, taskId={}", task.getId());
-        if (task.getId() == null) {
-            throw new ServiceException("主任务创建失败，未获取到任务ID");
+        if (task.getId() == null)
+        {
+            throw new ServiceException("failed to create task id");
         }
+
         List<TaskDataGroup> subTasks = buildSubTasks(task.getId(), request);
         log.info("Built sub tasks, taskId={}, subTaskCount={}", task.getId(), subTasks.size());
-        for (TaskDataGroup group : subTasks) {
+        for (TaskDataGroup group : subTasks)
+        {
             log.info("Validating sub task before insert, taskId={}, groupName={}, dataName={}, outputType={}, targetNum={}",
                     task.getId(), group.getGroupName(), group.getDataName(), group.getOutputType(), group.getTargetNum());
-            if (dataMapper.selectSameNameFile(task.getExperimentId(),"/" + group.getDataName() + group.getOutputType()) != null){
+            if (dataMapper.selectSameNameFile(task.getExperimentId(), "/" + group.getDataName() + group.getOutputType()) != null)
+            {
                 log.warn("Duplicate data name detected, taskId={}, groupName={}, dataName={}, outputType={}",
                         task.getId(), group.getGroupName(), group.getDataName(), group.getOutputType());
                 taskMapper.deleteById(task.getId());
-                throw new ServiceException(group.getGroupName() + "数据名称重复，请重新输入");
+                throw new ServiceException(group.getGroupName() + " data name already exists");
             }
-            if (group.getTargetNum() < 3 && (Objects.equals(group.getDataName(), "radar_track") || Objects.equals(group.getDataName(), "ads_b"))){
+            if (group.getTargetNum() < 3
+                    && (Objects.equals(group.getDataName(), "radar_track") || Objects.equals(group.getDataName(), "ads_b")))
+            {
                 log.warn("Target number validation failed, taskId={}, groupName={}, dataName={}, targetNum={}",
                         task.getId(), group.getGroupName(), group.getDataName(), group.getTargetNum());
                 taskMapper.deleteById(task.getId());
-                throw new ServiceException("目标数量不少于三个");
+                throw new ServiceException("target number must be at least 3");
             }
         }
+
         taskDataGroupMapper.batchInsert(subTasks);
         log.info("Sub tasks batch inserted, taskId={}, subTaskCount={}", task.getId(), subTasks.size());
         task.setDataGroups(subTasks);
-        rabbitTemplate.convertAndSend(EXCHANGE_NAME, ROUTING_KEY, task);
-        log.info("Simulation task sent to queue, taskId={}, routingKey={}, exchangeName={}",
-                task.getId(), ROUTING_KEY, EXCHANGE_NAME);
+        simulationTaskStreamQueue.enqueue(task);
+        log.info("Simulation task sent to redis stream, taskId={}, streamKey={}",
+                task.getId(), simulationTaskStreamQueue.getTaskStreamKey());
         return task;
     }
 
     @Override
-    public List<Task> selectTaskList(Task task) {
+    public List<Task> selectTaskList(Task task)
+    {
         return taskMapper.selectTaskList(task);
     }
 
     @Override
-    public Task selectById(Long id) {
+    public Task selectById(Long id)
+    {
         Task task = taskMapper.selectById(id);
-        if (task == null) {
-            throw new ServiceException("任务不存在");
+        if (task == null)
+        {
+            throw new ServiceException("task does not exist");
         }
         task.setDataGroups(taskDataGroupMapper.selectByTaskId(id));
         return task;
     }
 
     @Override
-    public void deleteTask(Long id) {
+    public void deleteTask(Long id)
+    {
         taskDataGroupMapper.deleteByTaskId(id);
         taskMapper.deleteById(id);
     }
 
-    private Task buildTask(TaskCreateRequest request, Date now) {
+    private Task buildTask(TaskCreateRequest request, Date now)
+    {
         Task task = new Task();
         task.setTaskCode(UUID.randomUUID().toString());
         task.setTaskName(request.getTaskName());
@@ -139,13 +159,17 @@ public class SimulationTaskServiceImpl implements SimulationTaskService {
         return task;
     }
 
-    private List<TaskDataGroup> buildSubTasks(Long taskId, TaskCreateRequest request) {
+    private List<TaskDataGroup> buildSubTasks(Long taskId, TaskCreateRequest request)
+    {
         List<TaskDataGroup> subTasks = new ArrayList<>();
-        for (TaskDataGroupDTO groupDTO : defaultIfNull(request.getDataGroups())) {
-            if (!Boolean.TRUE.equals(groupDTO.getEnabled())) {
+        for (TaskDataGroupDTO groupDTO : defaultIfNull(request.getDataGroups()))
+        {
+            if (!Boolean.TRUE.equals(groupDTO.getEnabled()))
+            {
                 continue;
             }
-            for (TaskDataItemDTO itemDTO : defaultIfNull(groupDTO.getItems())) {
+            for (TaskDataItemDTO itemDTO : defaultIfNull(groupDTO.getItems()))
+            {
                 TaskDataGroup group = new TaskDataGroup();
                 group.setTaskId(taskId);
                 group.setGroupName(groupDTO.getGroupName());
@@ -167,9 +191,11 @@ public class SimulationTaskServiceImpl implements SimulationTaskService {
         return subTasks;
     }
 
-    private List<TaskDataMetric> buildMetrics(List<TaskDataMetricDTO> metricDTOs) {
+    private List<TaskDataMetric> buildMetrics(List<TaskDataMetricDTO> metricDTOs)
+    {
         List<TaskDataMetric> metrics = new ArrayList<>();
-        for (TaskDataMetricDTO metricDTO : defaultIfNull(metricDTOs)) {
+        for (TaskDataMetricDTO metricDTO : defaultIfNull(metricDTOs))
+        {
             TaskDataMetric metric = new TaskDataMetric();
             metric.setFieldName(metricDTO.getFieldName());
             metric.setDataType(metricDTO.getDataType());
@@ -182,7 +208,8 @@ public class SimulationTaskServiceImpl implements SimulationTaskService {
         return metrics;
     }
 
-    private String buildDataCategorySummary(TaskCreateRequest request) {
+    private String buildDataCategorySummary(TaskCreateRequest request)
+    {
         return defaultIfNull(request.getDataGroups()).stream()
                 .filter(group -> Boolean.TRUE.equals(group.getEnabled()))
                 .map(TaskDataGroupDTO::getGroupName)
@@ -191,21 +218,24 @@ public class SimulationTaskServiceImpl implements SimulationTaskService {
                 .collect(Collectors.joining("、"));
     }
 
-    private String resolveExperimentId(TaskCreateRequest request) {
-        if (StringUtils.isNotEmpty(request.getExperimentId())) {
+    private String resolveExperimentId(TaskCreateRequest request)
+    {
+        if (StringUtils.isNotEmpty(request.getExperimentId()))
+        {
             return request.getExperimentId();
         }
         return request.getTestId() == null ? null : String.valueOf(request.getTestId());
     }
 
-    private boolean hasSubTaskConfig(TaskCreateRequest request) {
+    private boolean hasSubTaskConfig(TaskCreateRequest request)
+    {
         return defaultIfNull(request.getDataGroups()).stream()
                 .filter(group -> Boolean.TRUE.equals(group.getEnabled()))
                 .anyMatch(group -> !defaultIfNull(group.getItems()).isEmpty());
     }
 
-    private <T> List<T> defaultIfNull(List<T> values) {
+    private <T> List<T> defaultIfNull(List<T> values)
+    {
         return values == null ? List.of() : values;
     }
-
 }
