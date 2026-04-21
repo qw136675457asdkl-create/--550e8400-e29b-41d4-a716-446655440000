@@ -42,6 +42,12 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.32</version>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
             <groupId>com.dameng</groupId>
             <artifactId>DmJdbcDriver8</artifactId>
             <version>8.1.1.193</version>
