@@ -73,6 +73,8 @@ public class SimulationTaskServiceImpl implements SimulationTaskService
 
         Date now = new Date();
         Task task = buildTask(request, now);
+        List<TaskDataGroup> requestDataGroups = buildRequestDataGroups(request);
+        task.setRequestDataGroups(requestDataGroups);
         log.info("Built main task entity, taskName={}, experimentId={}, taskCode={}",
                 task.getTaskName(), task.getExperimentId(), task.getTaskCode());
         taskMapper.insert(task);
@@ -86,6 +88,10 @@ public class SimulationTaskServiceImpl implements SimulationTaskService
         log.info("Built sub tasks, taskId={}, subTaskCount={}", task.getId(), subTasks.size());
         for (TaskDataGroup group : subTasks)
         {
+            if (!Boolean.TRUE.equals(group.getEnabled()))
+            {
+                continue;
+            }
             log.info("Validating sub task before insert, taskId={}, groupName={}, dataName={}, outputType={}, targetNum={}",
                     task.getId(), group.getGroupName(), group.getDataName(), group.getOutputType(), group.getTargetNum());
             if (dataMapper.selectSameNameFile(task.getExperimentId(), "/" + group.getDataName() + group.getOutputType()) != null)
@@ -95,8 +101,9 @@ public class SimulationTaskServiceImpl implements SimulationTaskService
                 taskMapper.deleteById(task.getId());
                 throw new ServiceException(group.getGroupName() + " data name already exists");
             }
-            if (group.getTargetNum() < 3
-                    && (Objects.equals(group.getDataName(), "radar_track") || Objects.equals(group.getDataName(), "ads_b")))
+            if (group.getTargetNum() != null
+                    && group.getTargetNum() < 3
+                    && (Objects.equals(group.getGroupName(), "radar_track") || Objects.equals(group.getGroupName(), "ads_b")))
             {
                 log.warn("Target number validation failed, taskId={}, groupName={}, dataName={}, targetNum={}",
                         task.getId(), group.getGroupName(), group.getDataName(), group.getTargetNum());
@@ -164,31 +171,70 @@ public class SimulationTaskServiceImpl implements SimulationTaskService
         List<TaskDataGroup> subTasks = new ArrayList<>();
         for (TaskDataGroupDTO groupDTO : defaultIfNull(request.getDataGroups()))
         {
-            if (!Boolean.TRUE.equals(groupDTO.getEnabled()))
+            List<TaskDataItemDTO> items = defaultIfNull(groupDTO.getItems());
+            if (items.isEmpty())
             {
+                subTasks.add(buildTaskDataGroup(taskId, groupDTO, null));
                 continue;
             }
-            for (TaskDataItemDTO itemDTO : defaultIfNull(groupDTO.getItems()))
+            for (TaskDataItemDTO itemDTO : items)
             {
-                TaskDataGroup group = new TaskDataGroup();
-                group.setTaskId(taskId);
-                group.setGroupName(groupDTO.getGroupName());
-                group.setSortNo(groupDTO.getSortNo());
-                group.setDataName(StringUtils.isNotEmpty(itemDTO.getDataName()) ? itemDTO.getDataName() : groupDTO.getGroupName());
-                group.setRequestId(itemDTO.getRequestId());
-                group.setOutputType(itemDTO.getOutputType());
-                group.setDataSourceType(itemDTO.getDataSourceType());
-                group.setSourceFileName(itemDTO.getSourceFileName());
-                group.setStartTimeMs(itemDTO.getStartTimeMs());
-                group.setEndTimeMs(itemDTO.getEndTimeMs());
-                group.setFrequencyHz(itemDTO.getFrequencyHz());
-                group.setTargetNum(itemDTO.getTargetNum());
-                group.setMetric(buildMetrics(itemDTO.getMetrics()));
-                group.setStatus(TaskStatusEnum.DRAFT.name());
-                subTasks.add(group);
+                subTasks.add(buildTaskDataGroup(taskId, groupDTO, itemDTO));
             }
         }
         return subTasks;
+    }
+
+    private List<TaskDataGroup> buildRequestDataGroups(TaskCreateRequest request)
+    {
+        List<TaskDataGroup> requestDataGroups = new ArrayList<>();
+        for (TaskDataGroupDTO groupDTO : defaultIfNull(request.getDataGroups()))
+        {
+            List<TaskDataItemDTO> items = defaultIfNull(groupDTO.getItems());
+            if (items.isEmpty())
+            {
+                requestDataGroups.add(buildTaskDataGroup(null, groupDTO, null));
+                continue;
+            }
+            for (TaskDataItemDTO itemDTO : items)
+            {
+                requestDataGroups.add(buildTaskDataGroup(null, groupDTO, itemDTO));
+            }
+        }
+        return requestDataGroups;
+    }
+
+    private TaskDataGroup buildTaskDataGroup(Long taskId, TaskDataGroupDTO groupDTO, TaskDataItemDTO itemDTO)
+    {
+        TaskDataGroup group = new TaskDataGroup();
+        group.setTaskId(taskId);
+        group.setGroupName(groupDTO.getGroupName());
+        group.setSortNo(groupDTO.getSortNo());
+        group.setEnabled(Boolean.TRUE.equals(groupDTO.getEnabled()));
+        group.setStatus(TaskStatusEnum.DRAFT.name());
+        if (itemDTO == null)
+        {
+            group.setDataName(groupDTO.getGroupName());
+            group.setIsSimulation(Boolean.TRUE);
+            return group;
+        }
+        group.setDataName(StringUtils.isNotEmpty(itemDTO.getDataName()) ? itemDTO.getDataName() : groupDTO.getGroupName());
+        group.setRequestId(itemDTO.getRequestId());
+        group.setOutputType(itemDTO.getOutputType());
+        group.setDataSourceType(itemDTO.getDataSourceType());
+        group.setSourceFileName(itemDTO.getSourceFileName());
+        group.setStartTimeMs(itemDTO.getStartTimeMs());
+        group.setEndTimeMs(itemDTO.getEndTimeMs());
+        group.setFrequencyHz(itemDTO.getFrequencyHz());
+        group.setTargetNum(itemDTO.getTargetNum());
+        group.setIsSimulation(resolveSimulationFlag(itemDTO.getDataSourceType()));
+        group.setMetric(buildMetrics(itemDTO.getMetrics()));
+        return group;
+    }
+
+    private Boolean resolveSimulationFlag(String dataSourceType)
+    {
+        return !Objects.equals("existing", StringUtils.isEmpty(dataSourceType) ? null : dataSourceType.trim().toLowerCase());
     }
 
     private List<TaskDataMetric> buildMetrics(List<TaskDataMetricDTO> metricDTOs)

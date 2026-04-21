@@ -285,8 +285,8 @@
                 </el-form-item>
                 <el-form-item label="输出类型">
                   <el-radio-group v-model="currentSimulationTabState.outputType">
-                    <el-radio value="bit">bit</el-radio>
                     <el-radio value="csv">csv</el-radio>
+                    <el-radio value="bit">bit</el-radio>
                   </el-radio-group>
                 </el-form-item>
                 <el-form-item v-if="currentSimulationTab.showDataSource" label="数据模型">
@@ -543,6 +543,7 @@ const taskSocket = ref(null)
 const defaultOutputDirectory = 'csv_output/api_requests'
 const userStore = useUserStore()
 const MAX_SIMULATION_DURATION_MS = 3 * 24 * 60 * 60 * 1000
+const DEFAULT_SIMULATION_TIME_RANGE_MS = 5 * 60 * 1000
 const COORDINATE_RULES = [
   { key: 'lon', label: '\u7ecf\u5ea6', min: -180, max: 180, unit: 'deg' },
   { key: 'lat', label: '\u7eac\u5ea6', min: -90, max: 90, unit: 'deg' },
@@ -562,6 +563,10 @@ const simulationTabs = [
   { code: 'DATA9', label: '方位数据', showDataSource: true, showTargetNum: true },
   { code: 'DATA10', label: '闭锁信息', showDataSource: true, showTargetNum: true }
 ]
+const TARGET_NUM_TAB_CODES = ['RADAR_TRACK', 'ADSB']
+simulationTabs.forEach(tab => {
+  tab.showTargetNum = TARGET_NUM_TAB_CODES.includes(tab.code)
+})
 const metricDataTypeOptions = ['String', 'Integer', 'Int', 'Long', 'Float', 'Double', 'BigInt', 'uint32', 'Boolean', 'Enum', 'Hex']
 
 const SIMULATION_GROUP_NAME_SUBMIT_MAP = {
@@ -570,6 +575,15 @@ const SIMULATION_GROUP_NAME_SUBMIT_MAP = {
   RADAR_TRACK: 'radar_track',
   ADS_B: 'ads_b'
 }
+Object.assign(SIMULATION_GROUP_NAME_SUBMIT_MAP, {
+  EW: 'electronic_warfare',
+  COMM: 'communication_reconnaissance',
+  ADSB: 'ads_b',
+  AIS: 'ais',
+  ADS_B: 'target_towing_inquiry',
+  DATA9: 'bearing',
+  DATA10: 'lock_information'
+})
 
 const SIMULATION_GROUP_NAME_DISPLAY_MAP = simulationTabs.reduce((map, tab) => {
   map[tab.code] = tab.label
@@ -716,13 +730,10 @@ const currentSimulationTabState = computed(() => {
 
 const currentSimulationDataSourceOptions = computed(() => {
   const defaultOptions = [
-    { value: 'existing', label: '基于已有数据' },
-    { value: 'simulate', label: '模拟生成' }
+    { value: 'simulate', label: '模拟生成' },
+    { value: 'existing', label: '基于已有数据' }
   ]
-
-  return ['RADAR_TRACK', 'ADS_B'].includes(currentSimulationTab.value.code)
-    ? [...defaultOptions].reverse()
-    : defaultOptions
+    return defaultOptions
 })
 
 const currentSimulationMetrics = computed(() => {
@@ -904,11 +915,11 @@ function createTabState(tab) {
     enabled: tab.code === defaultActiveTab,
     dataName: '',
     outputType: 'csv',
-    dataSourceType: tab.showDataSource ? 'existing' : 'simulate',
+    dataSourceType: 'simulate',
     sourceFileName: '',
     timeRange: [],
     frequencyHz: 8,
-    targetNum: 1,
+    targetNum: tab.showTargetNum ? 1 : null,
     metrics: getMetricTemplate(tab.code)
   }
 }
@@ -1238,6 +1249,23 @@ function toTimestamp(dateTimeText) {
   return dateTimeText ? new Date(dateTimeText).getTime() : null
 }
 
+function resolvePayloadTimeRange(timeRange, fallbackStartTimeMs = Date.now()) {
+  const startTimeMs = toTimestamp(timeRange?.[0])
+  const endTimeMs = toTimestamp(timeRange?.[1])
+
+  if (Number.isFinite(startTimeMs) && Number.isFinite(endTimeMs) && endTimeMs > startTimeMs) {
+    return {
+      startTimeMs,
+      endTimeMs
+    }
+  }
+
+  return {
+    startTimeMs: fallbackStartTimeMs,
+    endTimeMs: fallbackStartTimeMs + DEFAULT_SIMULATION_TIME_RANGE_MS
+  }
+}
+
 function getDurationMs(timeRange) {
   if (!Array.isArray(timeRange) || timeRange.length !== 2) {
     return null
@@ -1315,9 +1343,8 @@ function buildRequestId(tabCode, timestamp) {
 
 function buildTaskPayload() {
   const timestamp = Date.now()
-  const enabledTabs = simulationTabs
+  const allTabs = simulationTabs
     .map((tab, index) => ({ ...tab, state: simulationForm.tabs[tab.code], sortNo: index + 1 }))
-    .filter(item => item.state.enabled)
 
   return {
     taskName: simulationForm.taskName,
@@ -1326,27 +1353,30 @@ function buildTaskPayload() {
     motionModel: simulationForm.motionModel,
     startCoordinate: simulationForm.startCoordinate,
     endCoordinate: simulationForm.endCoordinate,
-    dataGroups: enabledTabs.map(item => ({
-      groupCode: item.code,
-      groupName: resolveSimulationGroupName(item.code),
-      sortNo: item.sortNo,
-      enabled: true,
-      items: [
-        {
-          dataName: resolveDataName(item.label, item.state.dataName),
-          requestId: buildRequestId(item.code, timestamp),
-          outputType: item.state.outputType,
-          outputDirectory: defaultOutputDirectory,
-          dataSourceType: item.state.dataSourceType,
-          sourceFileName: item.state.sourceFileName || '',
-          startTimeMs: toTimestamp(item.state.timeRange?.[0]),
-          endTimeMs: toTimestamp(item.state.timeRange?.[1]),
-          frequencyHz: item.state.frequencyHz,
-          targetNum: item.state.targetNum,
-          metrics: buildMetricPayload(item.code)
-        }
-      ]
-    }))
+    dataGroups: allTabs.map(item => {
+      const timeRange = resolvePayloadTimeRange(item.state.timeRange, timestamp)
+      return {
+        groupCode: item.code,
+        groupName: resolveSimulationGroupName(item.code),
+        sortNo: item.sortNo,
+        enabled: item.state.enabled,
+        items: [
+          {
+            dataName: resolveDataName(item.label, item.state.dataName),
+            requestId: buildRequestId(item.code, timestamp),
+            outputType: item.state.outputType,
+            outputDirectory: defaultOutputDirectory,
+            dataSourceType: item.state.dataSourceType,
+            sourceFileName: item.state.sourceFileName || '',
+            startTimeMs: timeRange.startTimeMs,
+            endTimeMs: timeRange.endTimeMs,
+            frequencyHz: item.state.frequencyHz,
+            targetNum: item.state.targetNum,
+            metrics: buildMetricPayload(item.code)
+          }
+        ]
+      }
+    })
   }
 }
 

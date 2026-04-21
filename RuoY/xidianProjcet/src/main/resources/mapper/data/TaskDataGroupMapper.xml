@@ -14,13 +14,14 @@
         <result column="end_time_ms" property="endTimeMs" />
         <result column="frequency_hz" property="frequencyHz" />
         <result column="target_num" property="targetNum" />
+        <result column="enabled" property="enabled" jdbcType="BIT" />
         <result column="is_simulation" property="isSimulation" />
     </resultMap>
     <insert id="insert" parameterType="com.ruoyi.Xidian.domain.TaskDataGroup" useGeneratedKeys="true" keyProperty="id" keyColumn="ID">
         insert into SYSTEM_COLLABORATION_TEST.TASK_DATA_GROUP
-        (task_id, group_name, DATA_NAME, output_type, sort_no, start_time_ms, end_time_ms, frequency_hz, target_num, IS_SIMULATION)
+        (task_id, group_name, DATA_NAME, output_type, sort_no, start_time_ms, end_time_ms, frequency_hz, target_num, enabled, IS_SIMULATION)
         values
-        (#{taskId}, #{groupName}, #{dataName}, #{outputType}, #{sortNo}, #{startTimeMs}, #{endTimeMs}, #{frequencyHz}, #{targetNum}, #{isSimulation})
+        (#{taskId}, #{groupName}, #{dataName}, #{outputType}, #{sortNo}, #{startTimeMs}, #{endTimeMs}, #{frequencyHz}, #{targetNum}, #{enabled,jdbcType=BIT}, #{isSimulation})
     </insert>
     <insert id="batchInsert" parameterType="java.util.List">
         insert into SYSTEM_COLLABORATION_TEST.TASK_DATA_GROUP
@@ -34,6 +35,7 @@
         end_time_ms,
         frequency_hz,
         target_num,
+        enabled,
         IS_SIMULATION
         )
         values
@@ -48,6 +50,7 @@
             #{item.endTimeMs},
             #{item.frequencyHz},
             #{item.targetNum},
+            #{item.enabled,jdbcType=BIT},
             #{item.isSimulation}
             )
         </foreach>
@@ -63,7 +66,9 @@
             start_time_ms = #{startTimeMs},
             end_time_ms = #{endTimeMs},
             frequency_hz = #{frequencyHz},
-            target_num = #{targetNum}
+            target_num = #{targetNum},
+            enabled = #{enabled,jdbcType=BIT},
+            is_simulation = #{isSimulation}
         where id = #{id}
     </update>
     <delete id="deleteByTaskId" parameterType="java.lang.Long">

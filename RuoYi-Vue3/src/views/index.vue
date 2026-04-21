@@ -155,7 +155,7 @@ const commandCards = [
     key: 'data',
     title: '数据管理',
     description: '统一管理项目、试验与数据资产。',
-    path: '/bussiness',
+    path: '/data',
     accent: '#12b886',
     icon: ElementPlusIconsVue.FolderOpened || ElementPlusIconsVue.Document || ElementPlusIconsVue.Tickets
   },

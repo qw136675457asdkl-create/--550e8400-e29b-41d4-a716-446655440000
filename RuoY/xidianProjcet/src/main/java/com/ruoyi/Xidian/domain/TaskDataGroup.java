@@ -22,6 +22,7 @@ public class TaskDataGroup implements Serializable {
     private Long endTimeMs;
     private BigDecimal frequencyHz;
     private Integer targetNum;
+    private Boolean enabled;
     private String status;
     private Vector3 startVelocity;
     private Attitude startAttitude;
@@ -122,6 +123,14 @@ public class TaskDataGroup implements Serializable {
 
     public void setTargetNum(Integer targetNum) {
         this.targetNum = targetNum;
+    }
+
+    public Boolean getEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(Boolean enabled) {
+        this.enabled = enabled;
     }
 
     public String getStatus() {

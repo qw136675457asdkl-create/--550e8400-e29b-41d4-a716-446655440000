@@ -61,6 +61,12 @@
           </template>
           数据导入
         </el-button>
+        <el-button class="toolbar-action-btn toolbar-action-btn--import" type="primary" @click="emit('open-import')" v-hasPermi="['dataInfo:info:insert']">
+          <template #icon>
+            <svg-icon icon-class="upload" />
+          </template>
+          数据接收
+        </el-button>
         <el-button class="toolbar-action-btn toolbar-action-btn--export" type="primary" @click="emit('export-data')" v-hasPermi="['dataInfo:info:download']">
           <template #icon>
             <svg-icon icon-class="download" />

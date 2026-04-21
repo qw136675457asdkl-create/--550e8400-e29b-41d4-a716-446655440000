@@ -10,6 +10,7 @@ export function login(username, password, code, uuid) {
   }
   return request({
     url: '/login',
+    silent: true,
     headers: {
       isToken: false,
       repeatSubmit: false

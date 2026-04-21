@@ -22,6 +22,7 @@ public class Task extends BaseEntity {
     private String status;
     private String path;
     private List<TaskDataGroup> dataGroups = new ArrayList<>();
+    private List<TaskDataGroup> requestDataGroups = new ArrayList<>();
 
     public Long getId() {
         return id;
@@ -157,5 +158,13 @@ public class Task extends BaseEntity {
 
     public void addDataGroup(TaskDataGroup dataGroup) {
         this.dataGroups.add(dataGroup);
+    }
+
+    public List<TaskDataGroup> getRequestDataGroups() {
+        return requestDataGroups;
+    }
+
+    public void setRequestDataGroups(List<TaskDataGroup> requestDataGroups) {
+        this.requestDataGroups = requestDataGroups == null ? new ArrayList<>() : requestDataGroups;
     }
 }

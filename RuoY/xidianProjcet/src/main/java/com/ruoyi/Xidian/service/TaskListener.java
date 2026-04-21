@@ -276,11 +276,12 @@ public class TaskListener implements SmartLifecycle
         taskMapper.update(task);
         log.info("Task marked as RUNNING, taskId={}", task.getId());
 
-        task.setDataGroups(taskDataGroupMapper.selectByTaskId(task.getId()));
+        List<TaskDataGroup> persistedTaskDataGroups = taskDataGroupMapper.selectByTaskId(task.getId());
+        task.setDataGroups(persistedTaskDataGroups);
         log.info("Loaded task data groups, taskId={}, groupCount={}",
                 task.getId(), task.getDataGroups() == null ? 0 : task.getDataGroups().size());
 
-        TaskToPy taskToPy = buildPythonRequest(task, task.getDataGroups());
+        TaskToPy taskToPy = buildPythonRequest(task, resolvePythonRequestGroups(task, persistedTaskDataGroups));
         log.info("Built python request, taskId={}, requestId={}", task.getId(), taskToPy.getRequestId());
 
         JsonNode taskResponse = pythonSimulationService.submitAndWait(taskToPy);
@@ -475,6 +476,16 @@ public class TaskListener implements SmartLifecycle
         return taskToPy;
     }
 
+    private List<TaskDataGroup> resolvePythonRequestGroups(Task task, List<TaskDataGroup> persistedTaskDataGroups)
+    {
+        List<TaskDataGroup> requestDataGroups = task == null ? null : task.getRequestDataGroups();
+        if (requestDataGroups == null || requestDataGroups.isEmpty())
+        {
+            return persistedTaskDataGroups;
+        }
+        return requestDataGroups;
+    }
+
     private TaskToPy.BasicConfig buildBasicConfig(Task task)
     {
         TaskToPy.BasicConfig basicConfig = new TaskToPy.BasicConfig();
@@ -516,11 +527,31 @@ public class TaskListener implements SmartLifecycle
     private TaskToPy.DatasetConfig buildDatasetConfig(TaskDataGroup taskDataGroup, String datasetKey)
     {
         TaskToPy.DatasetConfig datasetConfig = new TaskToPy.DatasetConfig();
-        datasetConfig.setEnabled(Boolean.TRUE);
-        datasetConfig.setFilename(buildDatasetFilename(taskDataGroup));
-        datasetConfig.setFlightStartDatetime(requireDate(taskDataGroup.getStartTimeMs(), datasetKey + " start time"));
-        datasetConfig.setFlightEndDatetime(requireDate(taskDataGroup.getEndTimeMs(), datasetKey + " end time"));
-        datasetConfig.setSampleRateHz(requireValue(taskDataGroup.getFrequencyHz(), datasetKey + " sample rate"));
+        boolean enabled = !Boolean.FALSE.equals(taskDataGroup.getEnabled());
+        datasetConfig.setEnabled(enabled);
+        if (enabled)
+        {
+            datasetConfig.setFilename(buildDatasetFilename(taskDataGroup));
+            datasetConfig.setFlightStartDatetime(requireDate(taskDataGroup.getStartTimeMs(), datasetKey + " start time"));
+            datasetConfig.setFlightEndDatetime(requireDate(taskDataGroup.getEndTimeMs(), datasetKey + " end time"));
+            datasetConfig.setSampleRateHz(requireValue(taskDataGroup.getFrequencyHz(), datasetKey + " sample rate"));
+            applyTargetNum(datasetConfig, datasetKey, taskDataGroup.getTargetNum());
+            return datasetConfig;
+        }
+
+        datasetConfig.setFilename(buildOptionalDatasetFilename(taskDataGroup));
+        if (taskDataGroup.getStartTimeMs() != null)
+        {
+            datasetConfig.setFlightStartDatetime(new Date(taskDataGroup.getStartTimeMs()));
+        }
+        if (taskDataGroup.getEndTimeMs() != null)
+        {
+            datasetConfig.setFlightEndDatetime(new Date(taskDataGroup.getEndTimeMs()));
+        }
+        if (taskDataGroup.getFrequencyHz() != null)
+        {
+            datasetConfig.setSampleRateHz(taskDataGroup.getFrequencyHz());
+        }
         applyTargetNum(datasetConfig, datasetKey, taskDataGroup.getTargetNum());
         return datasetConfig;
     }
@@ -560,6 +591,22 @@ public class TaskListener implements SmartLifecycle
     {
         String dataName = requireText(taskDataGroup.getDataName(), "dataset data name");
         String outputType = requireText(taskDataGroup.getOutputType(), "dataset output type");
+        return buildDatasetFilename(dataName, outputType);
+    }
+
+    private String buildOptionalDatasetFilename(TaskDataGroup taskDataGroup)
+    {
+        String dataName = trimToNull(taskDataGroup.getDataName());
+        String outputType = trimToNull(taskDataGroup.getOutputType());
+        if (dataName == null || outputType == null)
+        {
+            return null;
+        }
+        return buildDatasetFilename(dataName, outputType);
+    }
+
+    private String buildDatasetFilename(String dataName, String outputType)
+    {
         String normalizedOutputType = outputType.startsWith(".")
                 ? outputType.substring(1).trim()
                 : outputType.trim();
@@ -596,11 +643,22 @@ public class TaskListener implements SmartLifecycle
 
     private String requireText(String value, String fieldName)
     {
-        if (StringUtils.isEmpty(value) || StringUtils.isEmpty(value.trim()))
+        String normalizedValue = trimToNull(value);
+        if (normalizedValue == null)
         {
             throw new ServiceException(fieldName + " is required");
         }
-        return value.trim();
+        return normalizedValue;
+    }
+
+    private String trimToNull(String value)
+    {
+        if (StringUtils.isEmpty(value))
+        {
+            return null;
+        }
+        String normalizedValue = value.trim();
+        return StringUtils.isEmpty(normalizedValue) ? null : normalizedValue;
     }
 
     private Coordinate requireCoordinate(Coordinate coordinate, String fieldName)
@@ -747,7 +805,9 @@ public class TaskListener implements SmartLifecycle
 
         for (TaskDataGroup taskDataGroup : taskDataGroups)
         {
-            if (taskDataGroup != null && taskDataGroup.getFrequencyHz() != null)
+            if (taskDataGroup != null
+                    && !Boolean.FALSE.equals(taskDataGroup.getEnabled())
+                    && taskDataGroup.getFrequencyHz() != null)
             {
                 return taskDataGroup.getFrequencyHz().intValue();
             }
