@@ -22,7 +22,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-
 import java.io.InputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -30,6 +29,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
@@ -113,11 +113,13 @@ public class DdataServiceImpl implements IDdataService
         }
         catch (IOException e)
         {
-            throw new ServiceException("解存失败: " + e.getMessage());
+            log.error("解压ZIP文件失败: {}", e.getMessage(), e);
+            throw new ServiceException("解压ZIP文件失败: " + e.getMessage());
         }
 
         if (!hasUploadedEntry)
         {
+            log.warn("数据文件中没有可上传的文件");
             throw new ServiceException("没有可上传的文件");
         }
     }
@@ -140,6 +142,7 @@ public class DdataServiceImpl implements IDdataService
             Path parentPath = targetPath.getParent();
             if (parentPath != null && Files.notExists(parentPath))
             {
+                log.info("创建目录: {}", parentPath);
                 Files.createDirectories(parentPath);
             }
             //如果相同目录下存在重名文件，加上后缀处理冲突
@@ -156,6 +159,7 @@ public class DdataServiceImpl implements IDdataService
             DdataInfo oldInfo = ddataMapper.selectSameNameFile(experimentInfo.getExperimentId(), storagePath);
             if (oldInfo != null)
             {
+                log.info("数据库中已存在相同文件: {}", oldInfo);
                 //处理数据库非空冲突
                 mergeExistingDataInfo(ddataInfo, oldInfo);
                 redisCache.deleteObject(CacheConstants.DATA_INFO_KEY + oldInfo.getId());
@@ -226,6 +230,7 @@ public class DdataServiceImpl implements IDdataService
     {
         if (StringUtils.isEmpty(extension) || !EXPERIMENT_ALLOWED_EXTENSIONS.contains(extension))
         {
+            log.warn("文件扩展名错误: {} {}", extension, relativePath);
             throw new ServiceException("文件扩展名错误: " + extension + " " + relativePath);
         }
     }
@@ -340,7 +345,7 @@ public class DdataServiceImpl implements IDdataService
 
         DdataInfo result = records.get(0);
         result.setFullPath("./data" + BuildDataFilePath(result) + result.getDataFilePath());
-        redisCache.setCacheObject(cacheKey, result);
+        redisCache.setCacheObject(cacheKey, result, 30, TimeUnit.MINUTES);
         return result;
     }
     @Override
@@ -357,6 +362,7 @@ public class DdataServiceImpl implements IDdataService
         try{
             ddataMapper.updateDdataInfos(ddataInfos);
             for(DdataInfo ddataInfo:ddataInfos){
+                log.info("重命名数据文件: {}", ddataInfo);
                 redisCache.deleteObject(CacheConstants.DATA_INFO_KEY + ddataInfo.getId());
             }
         } catch (Exception e) {
@@ -370,6 +376,7 @@ public class DdataServiceImpl implements IDdataService
         List<MultipartFile> uploadFiles = new ArrayList<>();
         if (file != null)
         {
+            log.info("上传文件: {}", file.getOriginalFilename());
             uploadFiles.add(file);
         }
         return insertDdataInfos(ddataInfo, uploadFiles);
@@ -380,6 +387,7 @@ public class DdataServiceImpl implements IDdataService
     {
         if (files == null || files.isEmpty())
         {
+            log.warn("文件不能为空");
             throw new ServiceException("文件不能为空");
         }
 
@@ -389,17 +397,20 @@ public class DdataServiceImpl implements IDdataService
         {
             if (file == null || file.isEmpty())
             {
+                log.warn("文件为空: {}", file.getOriginalFilename());
                 continue;
             }
             String uploadPath = normalizeExperimentUploadPath(file.getOriginalFilename());
             if (shouldSkipExperimentPath(uploadPath))
             {
+                log.warn("跳过文件: {}", uploadPath);
                 continue;
             }
 
             String extension = extractExtensionName(uploadPath);
             if ("zip".equals(extension))
             {
+                log.info("上传压缩文件: {}", uploadPath);
                 successCount += uploadBusinessZipArchive(file, ddataInfo, uploadPath);
                 continue;
             }
@@ -407,17 +418,20 @@ public class DdataServiceImpl implements IDdataService
             assertExperimentExtension(extension, uploadPath);
             try (InputStream inputStream = file.getInputStream())
             {
+                log.info("上传文件: {}", uploadPath);
                 storeBusinessImportFile(ddataInfo, uploadPath, inputStream, allowCustomDataName);
                 successCount++;
             }
             catch (IOException e)
             {
+                log.error("文件上传失败: {}", uploadPath, e);
                 throw new ServiceException("文件上传失败: " + e.getMessage());
             }
         }
 
         if (successCount == 0)
         {
+            log.warn("文件上传失败");
             throw new ServiceException("文件上传失败");
         }
         return successCount;
@@ -428,6 +442,7 @@ public class DdataServiceImpl implements IDdataService
     {
         if (ddataInfo == null)
         {
+            log.warn("导入参数不能为空");
             throw new ServiceException("导入参数不能为空");
         }
 
@@ -441,12 +456,14 @@ public class DdataServiceImpl implements IDdataService
                 || StringUtils.isEmpty(dataType)
                 || StringUtils.isEmpty(ddataInfo.getDataFilePath()))
         {
+            log.warn("导入参数不能为空");
             throw new ServiceException("项目名称、试验名称、数据名称、数据类型、数据路径不能为空");
         }
 
         DProjectInfo projectInfo = dProjectInfoMapper.selectSameNameProject(projectName);
         if (projectInfo == null)
         {
+            log.warn("项目不存在");
             throw new ServiceException("项目不存在");
         }
 
@@ -454,6 +471,7 @@ public class DdataServiceImpl implements IDdataService
                 dExperimentInfoMapper.selectSamePathExperiment(experimentName, projectInfo.getProjectId());
         if (experimentInfo == null)
         {
+            log.warn("试验信息不存在");
             throw new ServiceException("试验信息不存在");
         }
 
@@ -468,6 +486,7 @@ public class DdataServiceImpl implements IDdataService
         {
             if (Files.notExists(absolutePath) || Files.isDirectory(absolutePath))
             {
+                log.warn("数据文件不存在: {}", absolutePath);
                 throw new ServiceException("数据文件不存在");
             }
 
@@ -476,6 +495,7 @@ public class DdataServiceImpl implements IDdataService
             DdataInfo oldInfo = ddataMapper.selectSameNameFile(experimentInfo.getExperimentId(), normalizedDataFilePath);
             if (oldInfo != null)
             {
+                log.warn("数据文件已存在: {}", absolutePath);
                 mergeExistingDataInfo(insertDataInfo, oldInfo);
                 redisCache.deleteObject(CacheConstants.DATA_INFO_KEY + oldInfo.getId());
                 ddataMapper.updateDdataInfo(insertDataInfo);
@@ -535,12 +555,14 @@ public class DdataServiceImpl implements IDdataService
                 || StringUtils.isEmpty(experimentName)
                 || StringUtils.isEmpty(sourceFullPath))
         {
+            log.warn("导入参数不能为空");
             throw new ServiceException("项目名称、试验名称、源文件路径不能为空");
         }
 
         Path sourcePath = Paths.get(sourceFullPath).normalize();
         if (Files.notExists(sourcePath) || Files.isDirectory(sourcePath))
         {
+            log.warn("源数据文件不存在: {}", sourcePath);
             throw new ServiceException("源数据文件不存在");
         }
 
@@ -550,6 +572,7 @@ public class DdataServiceImpl implements IDdataService
         String sourceFileName = sourcePath.getFileName().toString();
         if (StringUtils.isEmpty(sourceFileName))
         {
+            log.warn("源数据文件名无效: {}", sourcePath);
             throw new ServiceException("源数据文件名无效");
         }
 
@@ -572,12 +595,14 @@ public class DdataServiceImpl implements IDdataService
         {
             if (Files.notExists(sourcePath) || Files.isDirectory(sourcePath))
             {
+                log.warn("源数据文件不存在: {}", sourcePath);
                 throw new ServiceException("源数据文件不存在");
             }
 
             Path targetParent = targetPath.getParent();
             if (targetParent != null && Files.notExists(targetParent))
             {
+                log.warn("目标数据文件路径不存在: {}", targetParent);
                 Files.createDirectories(targetParent);
             }
 
@@ -585,6 +610,7 @@ public class DdataServiceImpl implements IDdataService
         }
         catch (IOException e)
         {
+            log.warn("搬运数据文件失败: {}", e.getMessage());
             throw new ServiceException("搬运数据文件失败: " + e.getMessage());
         }
 
@@ -602,6 +628,7 @@ public class DdataServiceImpl implements IDdataService
         DProjectInfo projectInfo = dProjectInfoMapper.selectSameNameProject(projectName);
         if (projectInfo != null)
         {
+            log.warn("项目已存在: {}", projectName);
             return projectInfo;
         }
 
@@ -615,6 +642,7 @@ public class DdataServiceImpl implements IDdataService
         newProjectInfo.setPath("/" + projectName);
         if (Files.exists(projectRoot))
         {
+            log.warn("项目目录已存在: {}", projectRoot);
             dProjectInfoMapper.insertDProjectInfo(newProjectInfo);
         }
         else
@@ -625,6 +653,7 @@ public class DdataServiceImpl implements IDdataService
         DProjectInfo createdProjectInfo = dProjectInfoMapper.selectSameNameProject(projectName);
         if (createdProjectInfo == null)
         {
+            log.warn("项目创建失败: {}", projectName);
             throw new ServiceException("项目创建失败");
         }
         return createdProjectInfo;
@@ -659,6 +688,7 @@ public class DdataServiceImpl implements IDdataService
         newExperimentInfo.setPath("/" + experimentName);
         if (Files.exists(experimentRoot))
         {
+            log.warn("试验目录已存在: {}", experimentRoot);
             dExperimentInfoMapper.insertDExperimentInfo(newExperimentInfo);
         }
         else
@@ -670,6 +700,7 @@ public class DdataServiceImpl implements IDdataService
                 dExperimentInfoMapper.selectSamePathExperiment(experimentName, projectInfo.getProjectId());
         if (createdExperimentInfo == null)
         {
+            log.warn("试验创建失败: {}", experimentName);
             throw new ServiceException("试验创建失败");
         }
         return createdExperimentInfo;
@@ -747,11 +778,13 @@ public class DdataServiceImpl implements IDdataService
         }
         catch (IOException e)
         {
+            log.warn("文件上传失败: {}", e.getMessage());
             throw new ServiceException("文件上传失败: " + e.getMessage());
         }
 
         if (!hasUploadedEntry)
         {
+            log.warn("文件上传失败: {}", archivePath);
             throw new ServiceException("文件上传失败");
         }
         return uploadCount;
@@ -778,6 +811,7 @@ public class DdataServiceImpl implements IDdataService
             Path parentPath = targetPath.getParent();
             if (parentPath != null && Files.notExists(parentPath))
             {
+                log.warn("创建目录失败: {}", parentPath);
                 Files.createDirectories(parentPath);
             }
 
@@ -944,6 +978,7 @@ public class DdataServiceImpl implements IDdataService
             }
             catch (IOException e)
             {
+                log.warn("文件上传失败: {}", uploadPath, e);
                 throw new ServiceException("文件上传失败: " + e.getMessage());
             }
         }
@@ -985,6 +1020,7 @@ public class DdataServiceImpl implements IDdataService
             {
                 if (Files.notExists(targetPath) || Files.isDirectory(targetPath))
                 {
+                    log.warn("生成文件不存在: {}", normalizedFileName);
                     throw new ServiceException("生成文件不存在: " + normalizedFileName);
                 }
 
@@ -1016,12 +1052,14 @@ public class DdataServiceImpl implements IDdataService
     {
         if (ddataInfo == null || ddataInfo.getId() == null)
         {
+            log.warn("数据ID不能为空");
             throw new ServiceException("数据ID不能为空");
         }
 
         DdataInfo oldDataInfo = selectDataInfoRecord(ddataInfo.getId());
         if (oldDataInfo == null)
         {
+            log.warn("数据记录不存在: {}", ddataInfo.getId());
             throw new ServiceException("数据记录不存在");
         }
 
@@ -1059,10 +1097,12 @@ public class DdataServiceImpl implements IDdataService
             {
                 if (Files.notExists(oldAbsolutePath))
                 {
+                    log.warn("源数据文件不存在: {}", oldDataFilePath);
                     throw new ServiceException("源数据文件不存在");
                 }
                 if (ddataMapper.selectSameNameFile(ddataInfo.getExperimentId(),targetDataFilePath) != null && !newAbsolutePath.equals(oldAbsolutePath))
                 {
+                    log.warn("目标文件已存在: {}", targetDataFilePath);
                     throw new ServiceException("目标文件已存在");
                 }
 
@@ -1071,6 +1111,7 @@ public class DdataServiceImpl implements IDdataService
                     Path targetParent = newAbsolutePath.getParent();
                     if (targetParent != null && Files.notExists(targetParent))
                     {
+                        log.warn("创建目录失败: {}", targetParent);
                         Files.createDirectories(targetParent);
                     }
                     Files.move(oldAbsolutePath, newAbsolutePath, StandardCopyOption.REPLACE_EXISTING);
@@ -1079,6 +1120,7 @@ public class DdataServiceImpl implements IDdataService
         }
         catch (IOException e)
         {
+            log.warn("移动数据文件失败: {}", newAbsolutePath, e);
             throw new ServiceException("移动数据文件失败: " + e.getMessage());
         }
 
@@ -1145,12 +1187,14 @@ public class DdataServiceImpl implements IDdataService
                     Path targetParentDir = targetPath.getParent();
                     if (targetParentDir != null && !Files.exists(targetParentDir))
                     {
+                        log.warn("创建目录失败: {}", targetParentDir);
                         Files.createDirectories(targetParentDir);
                     }
                     Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
                 }
                 catch (IOException e)
                 {
+                    log.warn("备份文件失败: {}", sourcePath, e);
                     errorMsg.append("备份文件失败: ")
                             .append(sourcePath)
                             .append(" -> ")
@@ -1167,6 +1211,7 @@ public class DdataServiceImpl implements IDdataService
                 }
                 catch (IOException e)
                 {
+                    log.warn("删除源文件失败: {}", sourcePath, e);
                     errorMsg.append("删除源文件失败: ")
                             .append(sourcePath)
                             .append(", 原因: ")
@@ -1183,6 +1228,7 @@ public class DdataServiceImpl implements IDdataService
 
         if (errorMsg.length() > 0 && deleteDataIds.size() != ids.size())
         {
+            log.warn("备份数据失败，id={}, 错误信息={}", ids, errorMsg.toString());
             throw new ServiceException(errorMsg.toString());
         }
         return 1;

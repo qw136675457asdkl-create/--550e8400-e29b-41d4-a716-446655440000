@@ -1,10 +1,13 @@
 package com.ruoyi.Xidian.service.impl;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import com.ruoyi.common.constant.CacheConstants;
 import com.ruoyi.common.core.redis.RedisCache;
 import com.ruoyi.common.utils.DateUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.ruoyi.Xidian.mapper.DTargetInfoMapper;
@@ -20,6 +23,8 @@ import com.ruoyi.Xidian.service.IDTargetInfoService;
 @Service
 public class DTargetInfoServiceImpl implements IDTargetInfoService
 {
+    private static final Logger log = LoggerFactory.getLogger(DTargetInfoServiceImpl.class);
+
     @Autowired
     private DTargetInfoMapper dTargetInfoMapper;
 
@@ -46,7 +51,7 @@ public class DTargetInfoServiceImpl implements IDTargetInfoService
 
         // 将查询结果缓存到Redis中
         if (dTargetInfo != null) {
-            redisCache.setCacheObject(CacheConstants.EXPERIMENT_TARGET_KEY + targetId, dTargetInfo);
+            redisCache.setCacheObject(CacheConstants.EXPERIMENT_TARGET_KEY + targetId, dTargetInfo, 30, TimeUnit.MINUTES);
         }
 
         return dTargetInfo;
@@ -74,6 +79,7 @@ public class DTargetInfoServiceImpl implements IDTargetInfoService
     public int insertDTargetInfo(DTargetInfo dTargetInfo)
     {
         dTargetInfo.setCreateTime(DateUtils.getNowDate());
+        log.info("新增测试目标信息, targetId={}", dTargetInfo.getTargetId());
         return dTargetInfoMapper.insertDTargetInfo(dTargetInfo);
     }
 
@@ -89,6 +95,7 @@ public class DTargetInfoServiceImpl implements IDTargetInfoService
         dTargetInfo.setUpdateTime(DateUtils.getNowDate());
         // 删除缓存中的数据
         redisCache.deleteObject(CacheConstants.EXPERIMENT_TARGET_KEY + dTargetInfo.getTargetId());
+        log.info("更新测试目标信息, targetId={}", dTargetInfo.getTargetId());
         return dTargetInfoMapper.updateDTargetInfo(dTargetInfo);
     }
 
@@ -104,6 +111,7 @@ public class DTargetInfoServiceImpl implements IDTargetInfoService
         // 删除缓存中的数据
         for (String targetId : targetIds) {
             redisCache.deleteObject(CacheConstants.EXPERIMENT_TARGET_KEY + targetId);
+            log.info("删除测试目标信息, targetId={}", targetId);
         }
         return dTargetInfoMapper.deleteDTargetInfoByTargetIds(targetIds);
     }
@@ -119,6 +127,7 @@ public class DTargetInfoServiceImpl implements IDTargetInfoService
     {
         // 删除缓存中的数据
         redisCache.deleteObject(CacheConstants.EXPERIMENT_TARGET_KEY + targetId);
+        log.info("删除测试目标信息, targetId={}", targetId);
         return dTargetInfoMapper.deleteDTargetInfoByTargetId(targetId);
     }
      /**
@@ -132,4 +141,3 @@ public class DTargetInfoServiceImpl implements IDTargetInfoService
         return dTargetInfoMapper.selectTargetTypeList();
     }
 }
-

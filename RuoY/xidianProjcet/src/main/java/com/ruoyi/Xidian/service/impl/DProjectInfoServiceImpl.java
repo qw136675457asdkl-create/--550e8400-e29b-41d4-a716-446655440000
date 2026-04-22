@@ -9,6 +9,8 @@ import com.ruoyi.common.constant.CacheConstants;
 import com.ruoyi.common.core.redis.RedisCache;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -18,11 +20,14 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 @Service
 public class DProjectInfoServiceImpl implements IDProjectInfoService
 {
+    private static final Logger log = LoggerFactory.getLogger(DProjectInfoServiceImpl.class);
+
     @Autowired
     private DProjectInfoMapper dProjectInfoMapper;
 
@@ -45,7 +50,7 @@ public class DProjectInfoServiceImpl implements IDProjectInfoService
         }
         DProjectInfo projectInfo = dProjectInfoMapper.selectDProjectInfoByProjectId(projectId);
         projectInfo.setFullPath("./data" + projectInfo.getPath());
-        redisCache.setCacheObject(CacheConstants.PROJECT_INFO_KEY + projectId, projectInfo);
+        redisCache.setCacheObject(CacheConstants.PROJECT_INFO_KEY + projectId, projectInfo, 30, TimeUnit.MINUTES);
         return projectInfo;
     }
 
@@ -85,6 +90,7 @@ public class DProjectInfoServiceImpl implements IDProjectInfoService
                 }
 
                 dProjectInfo.setPath("/" + pathStr);
+                log.info("新增项目, projectName={}", dProjectInfo.getProjectName());
                 return dProjectInfoMapper.insertDProjectInfo(dProjectInfo);
             }
         }
@@ -129,6 +135,7 @@ public class DProjectInfoServiceImpl implements IDProjectInfoService
 
         redisCache.deleteObject(CacheConstants.PROJECT_INFO_KEY + dProjectInfo.getProjectId());
         dProjectInfo.setUpdateTime(DateUtils.getNowDate());
+        log.info("更新项目, projectId={}", dProjectInfo.getProjectId());
         return dProjectInfoMapper.updateDProjectInfo(dProjectInfo);
     }
 
@@ -194,6 +201,7 @@ public class DProjectInfoServiceImpl implements IDProjectInfoService
                 dProjectInfoMapper.deleteDProjectInfoByProjectId(projectId);
                 deleteProjectIds.add(projectId);
                 redisCache.deleteObject(CacheConstants.PROJECT_INFO_KEY + projectId);
+                log.info("删除项目, projectId={}", projectId);
             }
         }
 
@@ -238,6 +246,7 @@ public class DProjectInfoServiceImpl implements IDProjectInfoService
             }
 
             redisCache.deleteObject(CacheConstants.PROJECT_INFO_KEY + projectId);
+            log.info("删除项目, projectId={}", projectId);
             return dProjectInfoMapper.deleteDProjectInfoByProjectId(projectId);
         }
     }
