@@ -22,6 +22,8 @@ ruoyi:
 
   # 审计日志空间告警阈值（MB）
   thresholdMb: 5000
+  #日志推送目标url
+  targetUrl: http://10.1.22.71
 
 # 开发环境配置
 server:

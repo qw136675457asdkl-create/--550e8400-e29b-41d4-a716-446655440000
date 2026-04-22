@@ -109,7 +109,7 @@ public class AsyncFactory
                 SpringUtils.getBean(ISysOperLogService.class).insertOperlog(operLog);
                 try
                 {
-                    String targetUrl = "http://10.1.22.254";
+                    String targetUrl = "url";
                     String jsonLog = JSON.toJSONString(operLog);
                     HttpUtils.sendPost(targetUrl, jsonLog);
                 }
