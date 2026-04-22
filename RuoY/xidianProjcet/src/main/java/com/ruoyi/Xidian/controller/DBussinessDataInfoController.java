@@ -85,6 +85,7 @@ public class DBussinessDataInfoController extends BaseController
 
     @PreAuthorize("@ss.hasPermi('dataInfo:info:query')")
     @GetMapping("/{id}")
+    @Log(title = "查看业务数据详情", businessType = BusinessType.OTHER)
     public AjaxResult getDDataInfoByDdataId(@PathVariable Integer id)
     {
         DdataInfo ddataInfo = new DdataInfo();

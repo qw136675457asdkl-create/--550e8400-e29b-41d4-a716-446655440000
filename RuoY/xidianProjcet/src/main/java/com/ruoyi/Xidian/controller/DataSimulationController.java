@@ -60,6 +60,7 @@ public class DataSimulationController extends BaseController {
     }
 
     @GetMapping("/task/{id}")
+    @Log(title = "查看仿真任务详情",businessType = BusinessType.OTHER)
     public AjaxResult taskDetail(@PathVariable Long id) {
         return success(simulationTaskService.selectById(id));
     }

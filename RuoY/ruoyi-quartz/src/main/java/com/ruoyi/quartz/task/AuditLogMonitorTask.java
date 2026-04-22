@@ -82,7 +82,5 @@ public class AuditLogMonitorTask {
         notice.setStatus("0");
         notice.setCreateBy("system");
         noticeService.insertNotice(notice);
-
-        // 3. TODO: 发送邮件 / 钉钉 / 企业微信
     }
 }

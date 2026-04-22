@@ -70,6 +70,7 @@ public class DExperimentInfoController extends BaseController
 
     //@PreAuthorize("@ss.hasPermi('data:info:query')")
     @GetMapping(value = {"/", "/{infoId}"})
+    @Log(title = "查看项目或试验信息", businessType = BusinessType.OTHER)
     public AjaxResult getInfo(@PathVariable(value = "infoId", required = false) String infoId, @RequestParam String type)
     {
         validateInfoType(type);
@@ -408,6 +409,7 @@ public class DExperimentInfoController extends BaseController
     }
 
     @GetMapping("/path/{experimentId}")
+    @Log(title = "查看试验路径", businessType = BusinessType.OTHER)
     public AjaxResult getExperimentPathById(@PathVariable String experimentId)
     {
         if (experimentId == null || experimentId.trim().isEmpty())
