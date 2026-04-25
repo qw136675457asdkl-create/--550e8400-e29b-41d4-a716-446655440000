@@ -19,4 +19,6 @@ public interface TaskDataGroupMapper  {
     void deleteByTaskId(Long taskId);
 
     int batchInsert(@Param("list") List<TaskDataGroup> list);
+
+    List<TaskDataGroup> selectByTaskIdAndEnabled(Long id);
 }

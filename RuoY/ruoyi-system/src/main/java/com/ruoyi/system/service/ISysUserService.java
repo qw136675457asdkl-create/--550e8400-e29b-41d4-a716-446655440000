@@ -43,6 +43,8 @@ public interface ISysUserService
      */
     public SysUser selectUserByUserName(String userName);
 
+    public SysUser selectUserByNickName(String nickName);
+
     /**
      * 通过用户ID查询用户
      * 

@@ -1,5 +1,12 @@
 <template>
-  <el-dialog v-model="dialogVisible" width="88%" top="4vh" class="compare-preview-dialog" append-to-body @closed="emit('closed')">
+  <el-dialog
+    v-model="dialogVisible"
+    width="88%"
+    top="4vh"
+    class="compare-preview-dialog"
+    append-to-body
+    @closed="emit('closed')"
+  >
     <template #header>
       <div class="compare-preview-dialog__header">
         <div>
@@ -18,8 +25,8 @@
           </header>
 
           <div v-loading="item.loading" class="compare-preview-item__body" :style="{ height: itemHeight }">
-            <div v-if="item.previewType === 'table'">
-              <el-table v-if="item.rows.length > 0" :data="item.rows" border stripe :height="itemHeight">
+            <div v-if="item.previewType === 'table'" class="compare-preview-item__content">
+              <el-table v-if="item.rows.length > 0" :data="item.rows" border stripe height="100%">
                 <el-table-column
                   v-for="header in getCompareTableColumns(item)"
                   :key="header"
@@ -31,10 +38,14 @@
               <el-empty v-else :description="item.message || '暂无表格内容'" />
             </div>
 
-            <div v-else-if="item.previewType === 'text'" class="compare-text-preview">
-              <div v-if="item.rows.length > 0" class="compare-text-preview__body" :style="{ height: itemHeight }">
-                <div v-for="(line, index) in getCompareTextLines(item)" :key="`${item.id}-${index}`" class="compare-text-preview__line">
-                  <span class="compare-text-preview__line-number">{{ index + 1 }}</span>
+            <div v-else-if="item.previewType === 'text'" class="compare-preview-item__content compare-text-preview">
+              <div v-if="item.rows.length > 0" class="compare-text-preview__body">
+                <div
+                  v-for="(line, index) in getCompareTextLines(item)"
+                  :key="`${item.id}-${item.pageNum || 1}-${index}`"
+                  class="compare-text-preview__line"
+                >
+                  <span class="compare-text-preview__line-number">{{ getCompareLineNumber(item, index) }}</span>
                   <pre class="compare-text-preview__line-content">{{ line }}</pre>
                 </div>
               </div>
@@ -65,6 +76,18 @@
               <el-empty :description="item.message || '暂不支持在线比对该文件'" />
             </div>
           </div>
+
+          <pagination
+            v-if="hasComparePagination(item)"
+            class="compare-preview-item__pagination"
+            :total="item.total"
+            :page="item.pageNum"
+            :limit="item.pageSize"
+            :auto-scroll="false"
+            @update:page="value => updateComparePage(item, value)"
+            @update:limit="value => updateCompareLimit(item, value)"
+            @pagination="emit('pagination', item)"
+          />
         </section>
       </div>
       <el-empty v-else description="请选择需要比对的数据" />
@@ -72,7 +95,7 @@
 
     <template #footer>
       <div class="dialog-footer">
-        <el-button @click="dialogVisible = false">关 闭</el-button>
+        <el-button @click="dialogVisible = false">关闭</el-button>
       </div>
     </template>
   </el-dialog>
@@ -88,7 +111,7 @@ const props = defineProps({
   itemHeight: { type: String, default: '240px' }
 })
 
-const emit = defineEmits(['update:modelValue', 'closed'])
+const emit = defineEmits(['update:modelValue', 'pagination', 'closed'])
 
 const dialogVisible = computed({
   get: () => props.modelValue,
@@ -118,6 +141,24 @@ function getCompareTextLines(item) {
   })
 }
 
+function hasComparePagination(item) {
+  return ['table', 'text'].includes(item?.previewType) && Number(item?.total) > 0
+}
+
+function updateComparePage(item, value) {
+  item.pageNum = value
+}
+
+function updateCompareLimit(item, value) {
+  item.pageSize = value
+}
+
+function getCompareLineNumber(item, index) {
+  const pageNum = Number(item?.pageNum) || 1
+  const pageSize = Number(item?.pageSize) || 0
+  return (pageNum - 1) * pageSize + index + 1
+}
+
 function getComparePreviewMeta(item) {
   const previewLabel = getComparePreviewTypeLabel(item.previewType)
   let fileTypeLabel = '暂无内容'
@@ -145,7 +186,24 @@ function getComparePreviewMeta(item) {
 .compare-preview-item__header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
 .compare-preview-item__title { font-size: 15px; font-weight: 600; color: #111827; word-break: break-word; }
 .compare-preview-item__meta { font-size: 12px; color: #6b7280; white-space: nowrap; }
-.compare-preview-item__body { overflow: hidden; border: 1px solid #e5e7eb; border-radius: 10px; background: #ffffff; }
+.compare-preview-item__body {
+  width: 100%;
+  min-width: min(320px, 100%);
+  min-height: 220px;
+  max-width: 100%;
+  max-height: 76vh;
+  overflow: auto;
+  resize: both;
+  margin-right: auto;
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+}
+.compare-preview-item__body:hover { border-color: #cbd5e1; }
+.compare-preview-item__body:active { border-color: #94a3b8; }
+.compare-preview-item__content { width: 100%; height: 100%; }
+.compare-preview-item__pagination { margin-top: 12px; }
 .compare-preview-item__empty, .compare-media-preview { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 16px; background: #fafafa; }
 .compare-media-preview--audio { padding: 24px; }
 .compare-media-preview__frame { width: 100%; height: 100%; border: none; }
@@ -158,4 +216,14 @@ function getComparePreviewMeta(item) {
 .compare-text-preview__line:last-child { border-bottom: none; }
 .compare-text-preview__line-number { color: #9ca3af; font-size: 12px; line-height: 1.7; text-align: right; user-select: none; }
 .compare-text-preview__line-content { margin: 0; color: #111827; font-size: 12px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; font-family: Consolas, 'Courier New', monospace; }
+.compare-preview-dialog :deep(.pagination-container) { padding-left: 0; padding-right: 0; }
+.compare-preview-item__pagination :deep(.el-pagination) { justify-content: flex-end; flex-wrap: wrap; row-gap: 8px; }
+.compare-preview-item__body :deep(.el-table) { width: 100%; }
+.compare-preview-item__body :deep(.el-table__inner-wrapper),
+.compare-preview-item__body :deep(.el-table__body-wrapper),
+.compare-preview-item__body :deep(.el-scrollbar),
+.compare-preview-item__body :deep(.el-scrollbar__wrap),
+.compare-preview-item__body :deep(.el-scrollbar__view) {
+  height: 100%;
+}
 </style>

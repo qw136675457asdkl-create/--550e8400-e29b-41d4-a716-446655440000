@@ -120,7 +120,7 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>2.5.15</version>
                 <configuration>
-<!--                    <fork>true</fork> &lt;!&ndash; 如果没有该配置，devtools不会生效 &ndash;&gt;-->
+                    <!--                    <fork>true</fork> &lt;!&ndash; 如果没有该配置，devtools不会生效 &ndash;&gt;-->
                     <!-- 【核心配置】告诉 Maven 打包时把 scope 为 system 的依赖也打进 jar 包里 -->
                     <includeSystemScope>true</includeSystemScope>
                 </configuration>
@@ -140,7 +140,7 @@
                     <failOnMissingWebXml>false</failOnMissingWebXml>
                     <warName>${project.artifactId}</warName>
                 </configuration>
-           </plugin>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -152,5 +152,25 @@
         </plugins>
         <finalName>${project.artifactId}</finalName>
     </build>
+
+    <profiles>
+        <profile>
+            <id>with-matlab-engine</id>
+            <activation>
+                <property>
+                    <name>matlab.engine.jar.path</name>
+                </property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.mathworks</groupId>
+                    <artifactId>matlab-engine</artifactId>
+                    <version>R2020a</version>
+                    <scope>system</scope>
+                    <systemPath>${matlab.engine.jar.path}</systemPath>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 
 </project>

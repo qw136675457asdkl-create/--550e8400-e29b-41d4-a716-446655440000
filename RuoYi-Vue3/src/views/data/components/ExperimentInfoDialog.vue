@@ -15,7 +15,7 @@
       </el-form-item>
       <el-form-item label="所属项目" prop="parentId">
         <el-select v-model="formModel.parentId" placeholder="请选择所属项目" filterable clearable>
-          <el-option v-for="item in projectOptions" :key="item.projectId" :label="item.projectName" :value="item.projectId" />
+          <el-option v-for="item in projectOptions" :key="item.projectId" :label="item.projectName" :value="String(item.projectId)" />
         </el-select>
       </el-form-item>
       <el-form-item label="试验目标" prop="targetId">

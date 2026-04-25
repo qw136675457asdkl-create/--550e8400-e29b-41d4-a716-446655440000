@@ -59,7 +59,7 @@ public class MachineLearningConfigurationController extends BaseController
     /**
      * 获取当前机器学习环境配置
      */
-    @PreAuthorize("@ss.hasPermi('system:machineLearning:query')")
+    @PreAuthorize("@ss.hasAnyPermi('system:machineLearning:execute,system:machineLearning:save,system:machineLearning:reset')")
     @GetMapping("/get")
     public AjaxResult get()
     {

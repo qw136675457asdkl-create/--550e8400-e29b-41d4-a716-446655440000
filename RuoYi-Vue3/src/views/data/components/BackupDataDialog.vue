@@ -9,7 +9,7 @@
   >
     <div class="backup-data-dialog__body">
       <el-alert
-        title="当前已接通备份记录查询，恢复接口待后端提供后可继续接入。"
+        title="可查看未恢复的备份记录，并直接发起还原操作。"
         type="info"
         :closable="false"
         class="backup-data-dialog__alert"
@@ -27,12 +27,6 @@
         </el-form-item>
         <el-form-item label="备份人">
           <el-input v-model="queryParams.deleteBy" placeholder="请输入备份人" clearable @keyup.enter="emit('search')" />
-        </el-form-item>
-        <el-form-item label="恢复状态">
-          <el-select v-model="queryParams.isRestored" placeholder="请选择恢复状态" clearable>
-            <el-option label="未恢复" :value="0" />
-            <el-option label="已恢复" :value="1" />
-          </el-select>
         </el-form-item>
         <el-form-item label="备份时间">
           <el-date-picker
@@ -59,13 +53,10 @@
           table-layout="auto"
           empty-text="暂无备份数据"
         >
-          <el-table-column label="ID" prop="id" width="90" align="center" />
           <el-table-column label="数据名称" prop="dataName" min-width="180" show-overflow-tooltip />
           <el-table-column label="所属试验" prop="experimentName" min-width="180" show-overflow-tooltip />
           <el-table-column label="所属项目" prop="projectName" min-width="180" show-overflow-tooltip />
           <el-table-column label="数据种类" prop="dataType" min-width="160" show-overflow-tooltip />
-          <el-table-column label="源文件路径" prop="sourcePath" min-width="240" show-overflow-tooltip />
-          <el-table-column label="备份文件" prop="backupFilePath" min-width="240" show-overflow-tooltip />
           <el-table-column label="备份人" prop="deleteBy" min-width="120" show-overflow-tooltip />
           <el-table-column label="备份时间" min-width="180">
             <template #default="scope">
@@ -77,6 +68,20 @@
               <el-tag :type="scope.row.isRestored === 1 ? 'success' : 'warning'" effect="light" round>
                 {{ scope.row.isRestored === 1 ? '已恢复' : '未恢复' }}
               </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="120" align="center" fixed="right">
+            <template #default="scope">
+              <el-button
+                link
+                type="primary"
+                :disabled="scope.row.isRestored === 1 || restoringId === scope.row.id"
+                :loading="restoringId === scope.row.id"
+                v-hasPermi="['dataInfo:info:restore']"
+                @click="emit('restore', scope.row)"
+              >
+                还原
+              </el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -103,6 +108,7 @@ const props = defineProps({
   total: { type: Number, default: 0 },
   queryParams: { type: Object, required: true },
   dateRange: { type: Array, default: () => [] },
+  restoringId: { type: [Number, null], default: null },
   formatTime: { type: Function, default: value => value || '' }
 })
 
@@ -111,6 +117,7 @@ const emit = defineEmits([
   'update:dateRange',
   'search',
   'reset',
+  'restore',
   'pagination',
   'closed'
 ])

@@ -49,6 +49,14 @@ export function getBackupDataList(query, config = {}) {
   })
 }
 
+export function restoreBackupData(id, config = {}) {
+  return request({
+    url: '/data/bussiness/back/restore/' + id,
+    method: 'post',
+    ...config
+  })
+}
+
 export function getMovePathTree() {
   return request({
     url: '/data/bussiness/movePathTree',

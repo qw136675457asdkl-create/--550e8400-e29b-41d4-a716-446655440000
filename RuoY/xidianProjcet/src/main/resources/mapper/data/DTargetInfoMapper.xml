@@ -23,7 +23,7 @@
         <include refid="selectDTargetInfoVo"/>
         <where>
             <if test="targetId != null  and targetId != ''"> and target_id = #{targetId}</if>
-            <if test="targetName != null  and targetName != ''"> and target_name like concat('%', #{targetName}, '%')</if>
+            <if test="targetName != null  and targetName != ''"> and target_name = #{targetName}</if>
             <if test="targetType != null  and targetType != ''"> and target_type = #{targetType}</if>
             <if test="targetIdentity != null  and targetIdentity != ''"> and target_identity = #{targetIdentity}</if>
             <if test="targetDesc != null  and targetDesc != ''"> and target_desc = #{targetDesc}</if>

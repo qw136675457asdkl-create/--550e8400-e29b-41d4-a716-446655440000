@@ -58,7 +58,7 @@ public class SysMenuServiceImpl implements ISysMenuService
     @Override
     public List<SysMenu> selectMenuList(Long userId)
     {
-        return selectMenuList(new SysMenu(), userId);
+        return selectMenuList(new SysMenu(), 1L);
     }
 
     /**

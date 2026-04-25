@@ -49,6 +49,12 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-amqp</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.32</version>
+            <optional>true</optional>
+        </dependency>
     </dependencies>
     <build>
         <plugins>
@@ -62,5 +68,25 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>with-matlab-engine</id>
+            <activation>
+                <property>
+                    <name>matlab.engine.jar.path</name>
+                </property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.mathworks</groupId>
+                    <artifactId>matlab-engine</artifactId>
+                    <version>R2020a</version>
+                    <scope>system</scope>
+                    <systemPath>${matlab.engine.jar.path}</systemPath>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 
 </project>

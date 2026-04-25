@@ -142,8 +142,8 @@ const router = useRouter()
 const { proxy } = getCurrentInstance()
 
 const loginForm = ref({
-  username: "admin",
-  password: "admin123",
+  username: "",
+  password: "",
   rememberMe: false,
   code: "",
   uuid: ""
@@ -186,12 +186,14 @@ function handleLogin() {
           }
           return acc
         }, {})
-        router.push({ path: redirect.value || "/", query: otherQueryParams })
-      }).catch(() => {
-        loading.value = false
+        return router.push({ path: redirect.value || "/", query: otherQueryParams })
+      }).catch((error) => {
+        proxy?.$modal?.msgError(error?.message || "登录失败")
         if (captchaEnabled.value) {
           getCode()
         }
+      }).finally(() => {
+        loading.value = false
       })
     }
   })

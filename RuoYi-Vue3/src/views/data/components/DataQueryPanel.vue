@@ -12,7 +12,7 @@
       </el-form-item>
       <el-form-item label="所属项目" prop="projectId">
         <el-select v-model="queryParams.projectId" placeholder="请选择所属项目" clearable class="query-control">
-          <el-option v-for="item in projectOptions" :key="item.projectId" :label="item.projectName" :value="item.projectId" />
+          <el-option v-for="item in projectOptions" :key="item.projectId" :label="item.projectName" :value="String(item.projectId)" />
         </el-select>
       </el-form-item>
 
@@ -21,12 +21,15 @@
       </el-form-item>
       <el-form-item label="是否模拟" prop="isSimulation">
         <el-select v-model="queryParams.isSimulation" placeholder="请选择数据类型" clearable class="query-control">
-          <el-option label="真实" :value="true" />
-          <el-option label="模拟" :value="false" />
+          <el-option label="真实" :value="false" />
+          <el-option label="仿真" :value="true" />
         </el-select>
       </el-form-item>
       <el-form-item label="数据状态" prop="workStatus">
-        <el-input v-model="queryParams.workStatus" placeholder="请输入数据状态" clearable class="query-control" @keyup.enter="emit('search')" />
+        <el-select v-model="queryParams.workStatus" placeholder="请选择数据状态" clearable class="query-control">
+          <el-option label="完成" value="completed" />
+          <el-option label="尚未完成" value="incomplete" />
+        </el-select>
       </el-form-item>
       <el-form-item label="创建时间" class="query-date-item">
         <el-date-picker
@@ -61,6 +64,12 @@
           </template>
           数据导入
         </el-button>
+        <el-button class="toolbar-action-btn toolbar-action-btn--import" type="primary" @click="emit('open-import')" v-hasPermi="['dataInfo:info:insert']">
+          <template #icon>
+            <svg-icon icon-class="upload" />
+          </template>
+          数据接收
+        </el-button>
         <el-button class="toolbar-action-btn toolbar-action-btn--export" type="primary" @click="emit('export-data')" v-hasPermi="['dataInfo:info:download']">
           <template #icon>
             <svg-icon icon-class="download" />
@@ -69,13 +78,13 @@
         </el-button>
         <el-button class="toolbar-action-btn toolbar-action-btn--export" type="primary" @click="emit('rename-data')" v-hasPermi="['dataInfo:info:Rename']">
           <template #icon>
-            <svg-icon icon-class="rename" />
+            <svg-icon icon-class="example" />
           </template>
           规范重命名
         </el-button>
         <el-button class="toolbar-action-btn toolbar-action-btn--restore" type="primary" @click="emit('restore-data')" v-hasPermi="['dataInfo:info:backup', 'dataInfo:info:restore']">
           <template #icon>
-            <svg-icon icon-class="restore" />
+            <svg-icon icon-class="documentation" />
           </template>
           数据还原
         </el-button>
@@ -87,7 +96,7 @@
           v-hasPermi="['dataInfo:info:compare']"
         >
           <template #icon>
-            <svg-icon icon-class="compare" />
+            <svg-icon icon-class="eye-open" />
           </template>
           数据比对
         </el-button>
@@ -239,7 +248,7 @@ const dateRangeModel = computed({
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 18px;
 }
 
@@ -249,6 +258,7 @@ const dateRangeModel = computed({
   gap: 14px;
   align-items: center;
   flex: 1 1 720px;
+  min-width: 0;
 }
 
 .toolbar-query-actions {
@@ -258,6 +268,12 @@ const dateRangeModel = computed({
   align-items: center;
   gap: 12px;
   margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.global-actions-row :deep(.el-button + .el-button),
+.toolbar-query-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
 }
 
 .toolbar-query-actions :deep(.el-button) {
@@ -331,6 +347,17 @@ const dateRangeModel = computed({
   .query-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px 20px;
+  }
+}
+
+@media (max-width: 1520px) {
+  .global-actions-row {
+    flex: 1 1 100%;
+  }
+
+  .toolbar-query-actions {
+    flex: 1 1 100%;
+    margin-left: 0;
   }
 }
 

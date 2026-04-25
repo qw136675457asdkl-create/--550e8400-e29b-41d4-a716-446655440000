@@ -56,8 +56,8 @@
           <el-col :span="12">
             <el-form-item label="是否模拟" prop="isSimulation">
               <el-radio-group v-model="formModel.isSimulation">
-                <el-radio :label="true">真实</el-radio>
-                <el-radio :label="false">模拟</el-radio>
+                <el-radio :label="true">仿真</el-radio>
+                <el-radio :label="false">真实</el-radio>
               </el-radio-group>
             </el-form-item>
           </el-col>

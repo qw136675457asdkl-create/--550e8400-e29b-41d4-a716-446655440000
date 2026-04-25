@@ -1,10 +1,12 @@
 package com.ruoyi.Xidian.mapper;
 
+import com.ruoyi.Xidian.domain.DTO.DataQuery;
 import com.ruoyi.Xidian.domain.DdataInfo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
+import java.util.Map;
 
 @Mapper
 public interface DdataMapper {
@@ -14,6 +16,8 @@ public interface DdataMapper {
      * @return
      */
     List<DdataInfo> selectDdataInfoList(DdataInfo ddataInfo);
+
+    List<Map<String, Object>> selectIcdDataQueryList(DataQuery dataQuery);
 
     Integer insertDdataInfo(DdataInfo ddataInfo);
 

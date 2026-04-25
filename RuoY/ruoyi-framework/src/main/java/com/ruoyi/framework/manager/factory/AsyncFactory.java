@@ -4,7 +4,6 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.TimerTask;
 import javax.servlet.http.HttpServletRequest;
-import com.alibaba.fastjson2.JSON;
 import com.ruoyi.common.constant.CacheConstants;
 import com.ruoyi.common.constant.Constants;
 import com.ruoyi.common.core.redis.RedisCache;
@@ -14,15 +13,16 @@ import com.ruoyi.common.enums.OperatorType;
 import com.ruoyi.common.utils.LogUtils;
 import com.ruoyi.common.utils.ServletUtils;
 import com.ruoyi.common.utils.StringUtils;
-import com.ruoyi.common.utils.http.HttpUtils;
 import com.ruoyi.common.utils.http.UserAgentUtils;
 import com.ruoyi.common.utils.ip.AddressUtils;
 import com.ruoyi.common.utils.ip.IpUtils;
 import com.ruoyi.common.utils.spring.SpringUtils;
 import com.ruoyi.framework.audit.AuditLogTagSupport;
 import com.ruoyi.system.domain.SysLogininfor;
+import com.ruoyi.system.domain.SysNotice;
 import com.ruoyi.system.domain.SysOperLog;
 import com.ruoyi.system.service.ISysLogininforService;
+import com.ruoyi.system.service.ISysNoticeService;
 import com.ruoyi.system.service.ISysOperLogService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,13 +109,12 @@ public class AsyncFactory
                 SpringUtils.getBean(ISysOperLogService.class).insertOperlog(operLog);
                 try
                 {
-                    String targetUrl = "http://party-a-api.com/api/logs/receive";
-                    String jsonLog = JSON.toJSONString(operLog);
-                    HttpUtils.sendPost(targetUrl, jsonLog);
+                    SpringUtils.getBean(ISysNoticeService.class).insertNotice(buildOperNotice(operLog));
                 }
                 catch (Exception e)
                 {
-                    sys_user_logger.error("push oper log to external system failed: {}", e.getMessage(), e);
+                    sys_user_logger.error("insert oper log notice failed: title={}, operName={}",
+                            operLog.getTitle(), operLog.getOperName(), e);
                 }
             }
         };
@@ -219,6 +218,30 @@ public class AsyncFactory
             sys_user_logger.error("insert login info failed: username={}, status={}, message={}",
                     username, status, message, e);
         }
+    }
+
+    private static SysNotice buildOperNotice(SysOperLog operLog)
+    {
+        SysNotice notice = new SysNotice();
+        String title = StringUtils.defaultIfBlank(operLog.getTitle(), "系统操作日志");
+        notice.setNoticeTitle(StringUtils.left("系统操作日志公告-" + title, 50));
+        notice.setNoticeType("2");
+        notice.setNoticeContent(buildOperNoticeContent(operLog, title));
+        notice.setStatus("0");
+        notice.setCreateBy(StringUtils.defaultIfBlank(operLog.getOperName(), "system"));
+        return notice;
+    }
+
+    private static String buildOperNoticeContent(SysOperLog operLog, String title)
+    {
+        String operName = StringUtils.defaultIfBlank(operLog.getOperName(), "未知用户");
+        StringBuilder builder = new StringBuilder();
+        builder.append("用户").append(operName).append("执行了【").append(title).append("】操作");
+        if (operLog.getStatus() != null && operLog.getStatus() != BusinessStatus.SUCCESS.ordinal())
+        {
+            builder.append("，结果：失败");
+        }
+        return builder.toString();
     }
 
     private static Integer getLoginRetryCount(String username)

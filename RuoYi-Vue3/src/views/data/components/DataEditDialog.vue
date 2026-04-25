@@ -10,8 +10,8 @@
         <el-col :span="12">
           <el-form-item label="是否模拟" prop="isSimulation">
             <el-select v-model="formModel.isSimulation" placeholder="请选择">
-              <el-option label="真实" :value="true" />
-              <el-option label="模拟" :value="false" />
+              <el-option label="仿真" :value="true" />
+              <el-option label="真实" :value="false" />
             </el-select>
           </el-form-item>
         </el-col>

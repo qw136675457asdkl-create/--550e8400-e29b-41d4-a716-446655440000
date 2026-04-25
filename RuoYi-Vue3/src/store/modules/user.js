@@ -64,11 +64,15 @@ const useUserStore = defineStore(
         const uuid = userInfo.uuid
         return new Promise((resolve, reject) => {
           login(username, password, code, uuid).then(res => {
+            if (!res?.token) {
+              reject(new Error(res?.msg || '登录失败'))
+              return
+            }
             this.clearPasswordPolicy()
             setToken(res.token)
             this.token = res.token
             startHeartbeat()
-            resolve()
+            resolve(res)
           }).catch(error => {
             reject(error)
           })

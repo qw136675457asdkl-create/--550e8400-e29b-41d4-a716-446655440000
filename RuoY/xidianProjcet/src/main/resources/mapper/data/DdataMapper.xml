@@ -28,7 +28,7 @@
         <result column="create_by" property="createBy" />
         <result column="create_time" property="createTime" />
     </resultMap>
-    <insert id="insertDdataInfo">
+    <insert id="insertDdataInfo" useGeneratedKeys="true" keyProperty="id" keyColumn="ID">
         INSERT INTO SYSTEM_COLLABORATION_TEST.md_data_relation (
             target_id,
             target_type,
@@ -120,9 +120,11 @@
         <where>
             <if test="id != null and id != ''"> AND d.id = #{id} </if>
             <if test="dataName != null and dataName != ''"> AND d.data_name LIKE concat('%', #{dataName}, '%') </if>
+            <if test="projectName != null and projectName != ''"> AND p.project_name = #{projectName} </if>
             <if test="projectId != null and projectId != ''"> AND p.project_id = #{projectId} </if>
             <if test="experimentId != null and experimentId != ''">AND d.experiment_id = #{experimentId} </if>
             <if test="experimentName != null and experimentName != ''"> AND e.experiment_name LIKE concat('%', #{experimentName}, '%') </if>
+            <if test="dataFilePath != null and dataFilePath != ''"> AND d.data_file_path = #{dataFilePath} </if>
             <if test="createBy != null and createBy != ''"> AND e.create_by = #{createBy} </if>
             <if test="isSimulation != null"> AND d.is_simulation = #{isSimulation} </if>
             <if test="workStatus != null and workStatus != ''"> AND d.work_status = #{workStatus} </if>
@@ -133,6 +135,32 @@
                 AND date_format(d.create_time,'%y%m%d') &lt;= date_format(#{params.endTime},'%y%m%d')
             </if>
         </where>
+    </select>
+    <select id="selectIcdDataQueryList" parameterType="com.ruoyi.Xidian.domain.DTO.DataQuery" resultType="java.util.Map">
+        SELECT
+            p.project_name AS projectName,
+            p.project_content_desc AS projectDesc,
+            p.path AS projectPath,
+            e.experiment_name AS experimentName,
+            e.path AS experimentPath,
+            d.data_name AS dataName,
+            d.data_type AS dataType,
+            d.data_file_path AS dataFilePath
+        FROM SYSTEM_COLLABORATION_TEST.md_data_relation d
+        INNER JOIN SYSTEM_COLLABORATION_TEST.d_experiment_info e ON d.experiment_id = e.experiment_id
+        INNER JOIN SYSTEM_COLLABORATION_TEST.d_project_info p ON e.project_id = p.project_id
+        <where>
+            <if test="projectName != null and projectName != ''">
+                AND p.project_name = #{projectName}
+            </if>
+            <if test="experiementName != null and experiementName != ''">
+                AND e.experiment_name = #{experiementName}
+            </if>
+            <if test="startTime != null">
+                AND date_format(e.start_time,'%Y-%m-%d') = date_format(#{startTime},'%Y-%m-%d')
+            </if>
+        </where>
+        ORDER BY d.id ASC
     </select>
     <select id="selectDdataInfoById" resultMap="DdataInfoResultMap">
         SELECT

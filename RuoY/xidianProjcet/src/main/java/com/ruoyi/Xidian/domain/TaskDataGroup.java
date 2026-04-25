@@ -1,5 +1,7 @@
 package com.ruoyi.Xidian.domain;
 
+import lombok.Setter;
+
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.List;
@@ -7,21 +9,32 @@ import java.util.List;
 public class TaskDataGroup implements Serializable {
     private static final long serialVersionUID = 1L;
 
+    @Setter
     private Long id;
+    @Setter
     private Long taskId;
+    @Setter
     private String groupName;
     //数据名称
     private String dataName;
+    @Setter
     private String requestId;
+    @Setter
     private String outputType;
     private Integer sortNo;
+    @Setter
     private String outputDirectory;
+    @Setter
     private String dataSourceType;
+    @Setter
     private String sourceFileName;
+    @Setter
     private Long startTimeMs;
+    @Setter
     private Long endTimeMs;
     private BigDecimal frequencyHz;
     private Integer targetNum;
+    private Boolean enabled;
     private String status;
     private Vector3 startVelocity;
     private Attitude startAttitude;
@@ -32,80 +45,40 @@ public class TaskDataGroup implements Serializable {
         return id;
     }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
-
     public Long getTaskId() {
         return taskId;
-    }
-
-    public void setTaskId(Long taskId) {
-        this.taskId = taskId;
     }
 
     public String getGroupName() {
         return groupName;
     }
 
-    public void setGroupName(String groupName) {
-        this.groupName = groupName;
-    }
-
     public String getRequestId() {
         return requestId;
-    }
-
-    public void setRequestId(String requestId) {
-        this.requestId = requestId;
     }
 
     public String getOutputType() {
         return outputType;
     }
 
-    public void setOutputType(String outputType) {
-        this.outputType = outputType;
-    }
-
     public String getOutputDirectory() {
         return outputDirectory;
-    }
-
-    public void setOutputDirectory(String outputDirectory) {
-        this.outputDirectory = outputDirectory;
     }
 
     public String getDataSourceType() {
         return dataSourceType;
     }
 
-    public void setDataSourceType(String dataSourceType) {
-        this.dataSourceType = dataSourceType;
-    }
-
     public String getSourceFileName() {
         return sourceFileName;
-    }
-
-    public void setSourceFileName(String sourceFileName) {
-        this.sourceFileName = sourceFileName;
     }
 
     public Long getStartTimeMs() {
         return startTimeMs;
     }
 
-    public void setStartTimeMs(Long startTimeMs) {
-        this.startTimeMs = startTimeMs;
-    }
-
     public Long getEndTimeMs() {
         return endTimeMs;
-    }
-
-    public void setEndTimeMs(Long endTimeMs) {
-        this.endTimeMs = endTimeMs;
     }
 
     public BigDecimal getFrequencyHz() {
@@ -122,6 +95,14 @@ public class TaskDataGroup implements Serializable {
 
     public void setTargetNum(Integer targetNum) {
         this.targetNum = targetNum;
+    }
+
+    public Boolean getEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(Boolean enabled) {
+        this.enabled = enabled;
     }
 
     public String getStatus() {

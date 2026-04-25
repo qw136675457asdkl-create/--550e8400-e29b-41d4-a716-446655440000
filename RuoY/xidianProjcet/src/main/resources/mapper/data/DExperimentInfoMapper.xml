@@ -47,7 +47,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectSamePathExperiment" resultMap="DExperimentInfoResult">
         <include refid="selectDExperimentInfoVo"/>
-        where e.experiment_name = #{experimentName} AND e.projectId = #{projectId}
+        where e.experiment_name = #{experimentName} AND e.project_id = #{projectId}
+    </select>
+    <select id="selectExperimentByProjectNameAndExperimentName" resultMap="DExperimentInfoResult">
+        select e.experiment_id, e.target_id, e.experiment_name, e.project_id, e.start_time, d.project_name from SYSTEM_COLLABORATION_TEST.d_experiment_info e
+        left join SYSTEM_COLLABORATION_TEST.d_project_info d on e.project_id = d.project_id
+        where e.experiment_name = #{experimentName} AND d.project_name = #{projectName}
     </select>
     
     <select id="selectDExperimentInfoByExperimentId" parameterType="String" resultMap="DExperimentInfoResult">

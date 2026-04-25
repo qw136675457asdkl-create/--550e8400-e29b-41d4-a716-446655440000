@@ -2,6 +2,7 @@ package com.ruoyi.Xidian.service;
 
 import com.ruoyi.Xidian.domain.BackupData;
 import com.ruoyi.Xidian.domain.DdataInfo;
+import com.ruoyi.Xidian.domain.TaskDataGroup;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -19,6 +20,8 @@ public interface IDdataService {
 
     Integer insertDdataInfo(DdataInfo ddataInfo, MultipartFile file);
     Integer insertDdataInfos(DdataInfo ddataInfo, List<MultipartFile> files);
+    Integer insertDdataInfoByPath(DdataInfo ddataInfo);
+    Integer transportDdataFile(DdataInfo ddataInfo);
     Integer updateDdataInfo(DdataInfo ddataInfo);
 
     Integer deleteDdataInfos(List<Integer> ids);
@@ -31,9 +34,8 @@ public interface IDdataService {
             String experimentId,
             List<String> storedFileNames,
             List<String> sourceFileNames,
-            Integer sampleFrequency,
             String createBy,
-            String targetCategory);
+            String targetCategory, List<TaskDataGroup> taskDataGroup);
 
     default void uploadFiles(List<MultipartFile> files, List<String> relativePaths, String experimentId)
     {
@@ -45,4 +47,6 @@ public interface IDdataService {
     int backupDataById(Integer id);
 
     List<BackupData> selectBackupDataList(BackupData backupData);
+
+    String restoreDataFile(Integer BackDataId);
 }

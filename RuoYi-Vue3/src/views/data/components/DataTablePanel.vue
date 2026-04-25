@@ -11,7 +11,7 @@
         v-loading="loading"
         :data="businessList"
         class="data-table"
-        style="width: 100%; min-width: 1850px"
+        style="width: 100%"
         table-layout="auto"
         empty-text="暂无符合条件的数据"
         @selection-change="selection => emit('selection-change', selection)"
@@ -21,9 +21,9 @@
         <el-table-column label="数据名称" align="center" prop="dataName" min-width="170" :show-overflow-tooltip="true" />
         <el-table-column label="是否模拟" align="center" prop="isSimulation" min-width="130">
           <template #default="scope">
-            <el-tag class="status-chip" effect="light" round :type="scope.row.isSimulation === true ? 'success' : scope.row.isSimulation === false ? 'warning' : 'info'">
-              <span v-if="scope.row.isSimulation === true">真实数据</span>
-              <span v-else-if="scope.row.isSimulation === false">模拟数据</span>
+            <el-tag class="status-chip" effect="light" round :type="scope.row.isSimulation === true ? 'warning' : scope.row.isSimulation === false ? 'warning' : 'info'">
+              <span v-if="scope.row.isSimulation === true">仿真</span>
+              <span v-else-if="scope.row.isSimulation === false">真实</span>
               <span v-else>未知类型</span>
             </el-tag>
           </template>
@@ -53,7 +53,7 @@
           <template #default="scope">
             <div class="table-action-group">
               <el-tooltip content="备份" placement="top">
-                <el-button link type="primary" icon="Edit" @click="emit('backup', scope.row)" v-hasPermi="['dataInfo:info:backup']"></el-button>
+                <el-button link type="primary" :icon="DocumentCopy" @click="emit('backup', scope.row)" v-hasPermi="['dataInfo:info:backup']"></el-button>
               </el-tooltip>
               <el-tooltip content="详情" placement="top">
                 <el-button link type="primary" icon="View" @click="emit('view', scope.row)" v-hasPermi="['dataInfo:info:query']"></el-button>
@@ -82,6 +82,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { DocumentCopy } from '@element-plus/icons-vue'
 
 const props = defineProps({
   loading: {
@@ -157,17 +158,44 @@ const limitModel = computed({
 }
 
 .table-surface__table-scroll {
-  overflow-x: auto;
-  padding-bottom: 6px;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.96) 100%);
+  box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.72);
 }
 
 .data-table {
+  width: 100%;
   border-radius: 18px;
   overflow: hidden;
 }
 
+.data-table :deep(.el-table) {
+  --el-table-border-color: #eef2f7;
+  --el-table-row-hover-bg-color: #f8fbff;
+}
+
 .data-table :deep(.el-table__inner-wrapper::before) {
   display: none;
+}
+
+.data-table :deep(.el-scrollbar__bar.is-horizontal) {
+  height: 10px;
+  bottom: 8px;
+}
+
+.data-table :deep(.el-table__fixed-right-patch) {
+  background: #f8fafc;
+}
+
+.data-table :deep(.el-scrollbar__bar.is-horizontal .el-scrollbar__thumb) {
+  background: rgba(148, 163, 184, 0.55);
+  border-radius: 999px;
+}
+
+.data-table :deep(.el-scrollbar__bar.is-horizontal .el-scrollbar__thumb:hover) {
+  background: rgba(100, 116, 139, 0.72);
 }
 
 .data-table :deep(th.el-table__cell) {
@@ -232,6 +260,7 @@ const limitModel = computed({
 .table-surface :deep(.pagination-container) {
   padding-left: 0;
   padding-right: 0;
+  margin-top: 2px;
 }
 
 @media (max-width: 992px) {

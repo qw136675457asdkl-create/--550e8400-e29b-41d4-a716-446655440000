@@ -70,6 +70,7 @@ public class DExperimentInfoController extends BaseController
 
     //@PreAuthorize("@ss.hasPermi('data:info:query')")
     @GetMapping(value = {"/", "/{infoId}"})
+    @Log(title = "查看项目或试验信息", businessType = BusinessType.OTHER)
     public AjaxResult getInfo(@PathVariable(value = "infoId", required = false) String infoId, @RequestParam String type)
     {
         validateInfoType(type);
@@ -271,7 +272,7 @@ public class DExperimentInfoController extends BaseController
                 dProjectInfo.setProjectName(treeTableVo.getName());
                 dProjectInfo.setCreateTime(treeTableVo.getCreateTime());
                 dProjectInfo.setProjectContentDesc(treeTableVo.getContentDesc());
-                dProjectInfo.setPath(treeTableVo.getPath());
+                dProjectInfo.setPath("/" + treeTableVo.getName());
                 return toAjax(dProjectInfoService.updateDProjectInfo(dProjectInfo));
             }
             catch (Exception e)
@@ -289,7 +290,7 @@ public class DExperimentInfoController extends BaseController
         dExperimentInfo.setCreateTime(treeTableVo.getCreateTime());
         dExperimentInfo.setContentDesc(treeTableVo.getContentDesc());
         dExperimentInfo.setStartTime(treeTableVo.getStartTime());
-        dExperimentInfo.setPath(treeTableVo.getPath());
+        dExperimentInfo.setPath("/" + treeTableVo.getName());
         try
         {
             return toAjax(dExperimentInfoService.updateDExperimentInfo(dExperimentInfo));
@@ -408,6 +409,7 @@ public class DExperimentInfoController extends BaseController
     }
 
     @GetMapping("/path/{experimentId}")
+    @Log(title = "查看试验路径", businessType = BusinessType.OTHER)
     public AjaxResult getExperimentPathById(@PathVariable String experimentId)
     {
         if (experimentId == null || experimentId.trim().isEmpty())
