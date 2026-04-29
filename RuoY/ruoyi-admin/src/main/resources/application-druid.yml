@@ -6,7 +6,7 @@ spring:
             # 主库数据源
             master:
                 driverClassName: dm.jdbc.driver.DmDriver
-                url: jdbc:dm://10.1.22.71:5236?schema=SYSTEM_COLLABORATION_TEST&useUnicode=true&characterEncoding=utf-8
+                url: jdbc:dm://192.168.75.129:5236?schema=SYSTEM_COLLABORATION_TEST&useUnicode=true&characterEncoding=utf-8
                 username: sysdba
                 password: Hyy1208@dm
             # 从库数据源

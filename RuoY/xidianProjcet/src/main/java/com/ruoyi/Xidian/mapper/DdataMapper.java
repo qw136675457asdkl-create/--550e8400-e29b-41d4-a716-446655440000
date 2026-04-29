@@ -30,4 +30,8 @@ public interface DdataMapper {
     int updateDdataInfos(@Param("list")List<DdataInfo> ddataInfos);
 
     DdataInfo selectDdataInfoById(Integer id);
+
+    Integer updateStorageFileId(@Param("id") Integer id, @Param("storageFileId") Long storageFileId);
+
+    int countByExperimentId(@Param("experimentId") String experimentId);
 }

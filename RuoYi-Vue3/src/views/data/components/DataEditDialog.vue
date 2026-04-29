@@ -18,12 +18,12 @@
       </el-row>
       <el-row>
         <el-col :span="12">
-          <el-form-item label="数据种类" prop="dataType">
-            <el-select v-model="formModel.dataType" placeholder="请选择数据种类">
+          <el-form-item label="数据类型" prop="dataType">
+            <el-select v-model="formModel.dataType" placeholder="请选择数据类型">
               <el-option label="ADS-B目标元数据" value="ADS-B目标元数据" />
               <el-option label="AIS目标元数据" value="AIS目标元数据" />
               <el-option label="通信情报日志元数据" value="通信情报日志元数据" />
-              <el-option label="交战闭锁元数据" value="交战闭锁元数据" />
+              <el-option label="交战闭环元数据" value="交战闭环元数据" />
               <el-option label="电子战截获元数据" value="电子战截获元数据" />
               <el-option label="载机姿态元数据" value="载机姿态元数据" />
               <el-option label="惯导状态元数据" value="惯导状态元数据" />
@@ -32,11 +32,6 @@
               <el-option label="目标牵引询问元数据" value="目标牵引询问元数据" />
               <el-option label="其他元数据" value="其他元数据" />
             </el-select>
-          </el-form-item>
-        </el-col>
-        <el-col :span="12">
-          <el-form-item label="文件名称" prop="fileName" v-if="title === '修改数据'">
-            <el-input v-model="formModel.fileName" placeholder="请输入文件名称" />
           </el-form-item>
         </el-col>
       </el-row>
@@ -124,8 +119,8 @@
     </el-form>
     <template #footer>
       <div class="dialog-footer">
-        <el-button type="primary" @click="handleSubmit">确 定</el-button>
-        <el-button @click="dialogVisible = false">取 消</el-button>
+        <el-button type="primary" @click="handleSubmit">确定</el-button>
+        <el-button @click="dialogVisible = false">取消</el-button>
       </div>
     </template>
   </el-dialog>

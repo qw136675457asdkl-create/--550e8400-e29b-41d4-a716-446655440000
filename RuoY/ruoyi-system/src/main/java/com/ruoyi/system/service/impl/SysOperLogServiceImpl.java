@@ -2,8 +2,7 @@ package com.ruoyi.system.service.impl;
 
 import java.util.List;
 
-import com.ruoyi.common.annotation.DataSource;
-import com.ruoyi.common.enums.DataSourceType;
+import com.ruoyi.common.utils.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.ruoyi.system.domain.SysOperLog;
@@ -18,6 +17,22 @@ import com.ruoyi.system.service.ISysOperLogService;
 @Service
 public class SysOperLogServiceImpl implements ISysOperLogService
 {
+    private static final int TITLE_MAX_LENGTH = 50;
+    private static final int METHOD_MAX_LENGTH = 100;
+    private static final int REQUEST_METHOD_MAX_LENGTH = 10;
+
+    private static final int OPER_NAME_MAX_LENGTH = 50;
+    private static final int DEPT_NAME_MAX_LENGTH = 50;
+    private static final int OPER_URL_MAX_LENGTH = 255;
+    private static final int OPER_IP_MAX_LENGTH = 128;
+    private static final int OPER_LOCATION_MAX_LENGTH = 255;
+    private static final int OPER_PARAM_MAX_LENGTH = 1000;
+    private static final int JSON_RESULT_MAX_LENGTH = 1000;
+    private static final int ERROR_MSG_MAX_LENGTH = 1000;
+    private static final int EVENT_TYPE_MAX_LENGTH = 64;
+    private static final int BIZ_CATEGORY_MAX_LENGTH = 64;
+    private static final int HIGHLIGHT_TAG_MAX_LENGTH = 64;
+
     @Autowired
     private SysOperLogMapper operLogMapper;
 
@@ -29,7 +44,44 @@ public class SysOperLogServiceImpl implements ISysOperLogService
     @Override
     public void insertOperlog(SysOperLog operLog)
     {
+        if (operLog == null)
+        {
+            return;
+        }
+        trimOperLogFields(operLog);
         operLogMapper.insertOperlog(operLog);
+    }
+
+    private void trimOperLogFields(SysOperLog operLog)
+    {
+        if (operLog == null)
+        {
+            return;
+        }
+
+        operLog.setTitle(trimToLength(operLog.getTitle(), TITLE_MAX_LENGTH));
+        operLog.setMethod(trimToLength(operLog.getMethod(), METHOD_MAX_LENGTH));
+        operLog.setRequestMethod(trimToLength(operLog.getRequestMethod(), REQUEST_METHOD_MAX_LENGTH));
+        operLog.setOperName(trimToLength(operLog.getOperName(), OPER_NAME_MAX_LENGTH));
+        operLog.setDeptName(trimToLength(operLog.getDeptName(), DEPT_NAME_MAX_LENGTH));
+        operLog.setOperUrl(trimToLength(operLog.getOperUrl(), OPER_URL_MAX_LENGTH));
+        operLog.setOperIp(trimToLength(operLog.getOperIp(), OPER_IP_MAX_LENGTH));
+        operLog.setOperLocation(trimToLength(operLog.getOperLocation(), OPER_LOCATION_MAX_LENGTH));
+        operLog.setOperParam(trimToLength(operLog.getOperParam(), OPER_PARAM_MAX_LENGTH));
+        operLog.setJsonResult(trimToLength(operLog.getJsonResult(), JSON_RESULT_MAX_LENGTH));
+        operLog.setErrorMsg(trimToLength(operLog.getErrorMsg(), ERROR_MSG_MAX_LENGTH));
+        operLog.setEventType(trimToLength(operLog.getEventType(), EVENT_TYPE_MAX_LENGTH));
+        operLog.setBizCategory(trimToLength(operLog.getBizCategory(), BIZ_CATEGORY_MAX_LENGTH));
+        operLog.setHighlightTag(trimToLength(operLog.getHighlightTag(), HIGHLIGHT_TAG_MAX_LENGTH));
+    }
+
+    private String trimToLength(String value, int maxLength)
+    {
+        if (StringUtils.isEmpty(value) || maxLength <= 0)
+        {
+            return value;
+        }
+        return StringUtils.substring(value, 0, maxLength);
     }
 
     /**

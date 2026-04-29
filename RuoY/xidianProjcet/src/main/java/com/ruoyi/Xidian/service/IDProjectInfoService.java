@@ -19,13 +19,6 @@ public interface IDProjectInfoService
      */
     public DProjectInfo selectDProjectInfoByProjectId(Long projectId);
 
-    /**
-     * 查询项目信息列表
-     * 
-     * @param dProjectInfo 项目信息
-     * @return 项目信息集合
-     */
-    public List<DProjectInfo> selectDProjectInfoList(DProjectInfo dProjectInfo);
 
     public List<DProjectInfo> selectAllDProjectInfo();
 

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ICD version="1.0" name="TargetMessage" byte_order="big_endian" alignment="1">
+    <!-- 最外层消息结构体，总长度25字节 -->
+    <struct name="TargetMessage" size="25">
+        <!-- 0~1字节：帧头 -->
+        <field name="frame_header" type="uint16_t" offset="0" size="2" 
+               description="帧头，固定同步字" fixed_value="0x3F4E"/>
+        
+        <!-- 2~3字节：消息长度 -->
+        <field name="msg_length" type="uint16_t" offset="2" size="2" 
+               description="消息长度：BIT15为响应标志（0=需要响应，1=不需要响应）；BIT14:0为除帧头、校验字节、帧尾外的所有字节之和"/>
+        
+        <!-- 4~5字节：消息ID -->
+        <field name="msg_id" type="uint16_t" offset="4" size="2" 
+               description="消息ID：BIT15:8为目的ID（0x82=询问处理 / 0x81=询问接口）；BIT7:0为源ID（0x98=调试终端）"/>
+        
+        <!-- 6~7字节：帧类型 -->
+        <field name="frame_type" type="uint16_t" offset="6" size="2" 
+               description="帧类型：BIT15:8为主类型（0xAE=数据类消息）；BIT7:0为副类型（0x48）"/>
+        
+        <!-- 8字节：数据类型 -->
+        <field name="data_type" type="uint8_t" offset="8" size="1" 
+               description="数据类型：BIT7-2为保留位；BIT1=高度有效标志（1=有效，0=无效）；BIT0=经纬度有效标志（1=有效，0=无效）"/>
+        
+        <!-- 9~12字节：平台经度 -->
+        <field name="platform_longitude" type="int32_t" offset="9" size="4" 
+               description="平台经度：有符号整型，单位rad，范围-π~+π，-π~0为西经，0~π为东经，LSB=π/2^31"/>
+        
+        <!-- 13~16字节：平台纬度 -->
+        <field name="platform_latitude" type="int32_t" offset="13" size="4" 
+               description="平台纬度：有符号整型，单位rad，范围-π/2~+π/2，-π/2~0为南纬，0~π/2为北纬，LSB=π/2^31"/>
+        
+        <!-- 17~20字节：平台高度 -->
+        <field name="platform_altitude" type="int32_t" offset="17" size="4" 
+               description="平台高度：有符号整型，单位m，范围-500~32767，LSB=1m"/>
+        
+        <!-- 21~22字节：CRC校验 -->
+        <field name="crc_check" type="uint16_t" offset="21" size="2" 
+               description="CRC校验值，计算范围：除帧头、帧尾和本校验字段外的所有字节"/>
+        
+        <!-- 23~24字节：帧尾 -->
+        <field name="frame_tail" type="uint16_t" offset="23" size="2" 
+               description="帧尾，固定结束字" fixed_value="0xB0B9"/>
+    </struct>
+</ICD>

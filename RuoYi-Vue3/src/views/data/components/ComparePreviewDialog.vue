@@ -11,7 +11,9 @@
       <div class="compare-preview-dialog__header">
         <div>
           <div class="compare-preview-dialog__title">数据比对</div>
-          <div class="compare-preview-dialog__subtitle">已选 {{ items.length }} 条数据，展示区域会根据数量自动调整</div>
+          <div class="compare-preview-dialog__subtitle">
+            已加载 {{ items.length }} 项内容，展示面板会根据预览类型自动切换。
+          </div>
         </div>
       </div>
     </template>
@@ -90,7 +92,7 @@
           />
         </section>
       </div>
-      <el-empty v-else description="请选择需要比对的数据" />
+      <el-empty v-else description="请至少选择两条数据进行比对" />
     </div>
 
     <template #footer>
@@ -164,7 +166,9 @@ function getComparePreviewMeta(item) {
   let fileTypeLabel = '暂无内容'
 
   if (item.previewType === 'table' || item.previewType === 'text') {
-    fileTypeLabel = item.total > 0 ? `展示 ${item.rows.length}/${item.total}` : '暂无内容'
+    fileTypeLabel = item.rows.length > 0
+      ? (item.total > 0 ? `展示 ${item.rows.length}/${item.total}` : `展示 ${item.rows.length} 条`)
+      : '暂无内容'
   } else if (item.objectUrl) {
     fileTypeLabel = '已加载预览'
   } else if (item.loading) {

@@ -37,7 +37,7 @@ public interface IDExperimentInfoService
      * @param dExperimentInfo 试验信息主
      * @return 结果
      */
-    public int insertDExperimentInfo(DExperimentInfo dExperimentInfo);
+    public String insertDExperimentInfo(DExperimentInfo dExperimentInfo);
 
     /**
      * 修改试验信息主

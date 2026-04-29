@@ -1,0 +1,6 @@
+secure:
+  minio:
+    endpoint: http://192.168.75.129:9000
+    access-key: admin
+    secret-key: YourStrongPassword123
+    bucket: uploads

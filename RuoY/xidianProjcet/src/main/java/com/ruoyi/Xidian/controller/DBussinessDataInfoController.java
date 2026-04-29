@@ -5,11 +5,8 @@ import com.ruoyi.Xidian.domain.DTO.*;
 import com.ruoyi.Xidian.mapper.DExperimentInfoMapper;
 import com.ruoyi.Xidian.mapper.DProjectInfoMapper;
 import com.ruoyi.Xidian.mapper.DdataMapper;
-import com.ruoyi.Xidian.service.IDExperimentInfoService;
-import com.ruoyi.Xidian.service.IDProjectInfoService;
-import com.ruoyi.Xidian.service.IDTargetInfoService;
-import com.ruoyi.Xidian.service.IDdataService;
-import com.ruoyi.Xidian.support.PathLockManager;
+import com.ruoyi.Xidian.mapper.MdFileStorageMapper;
+import com.ruoyi.Xidian.service.*;
 import com.ruoyi.common.annotation.Anonymous;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.config.RuoYiConfig;
@@ -19,11 +16,13 @@ import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
+import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.file.FileUtils;
 import com.ruoyi.common.utils.uuid.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -42,6 +41,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
@@ -66,14 +66,15 @@ public class DBussinessDataInfoController extends BaseController
     private DExperimentInfoMapper dExperimentInfoMapper;
 
     @Autowired
-    private IDProjectInfoService dProjectInfoService;
-
-    @Autowired
-    private PathLockManager pathLockManager;
-    @Autowired
     private IDTargetInfoService iDTargetInfoService;
     @Autowired
     private DProjectInfoMapper dProjectInfoMapper;
+
+    @Autowired
+    private MdFileStorageMapper mdFileStorageMapper;
+
+    @Autowired
+    private FileStorageService fileStorageService;
 
     @GetMapping("/experimentInfoTree")
     public AjaxResult getDExperimentInfoTree()
@@ -123,55 +124,43 @@ public class DBussinessDataInfoController extends BaseController
     }
 
     @PreAuthorize("@ss.hasPermi('dataInfo:info:insert')")
-    @PostMapping("/insert")
+    @PostMapping(value = "/insert", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Log(title = "导入业务数据", businessType = BusinessType.INSERT)
     public AjaxResult insertDDataInfo(
             @ModelAttribute DdataInfo ddataInfo,
-            @RequestParam(value = "files", required = false) List<MultipartFile> files,
-            @RequestParam(value = "file", required = false) MultipartFile file)
+            @RequestParam(value = "files" ) List<MultipartFile> files)
     {
-        try {
-            List<MultipartFile> uploadFiles = new ArrayList<>();
-            if (files != null && !files.isEmpty())
-            {
-                uploadFiles.addAll(files);
-            }
-            if (file != null && !file.isEmpty())
-            {
-                uploadFiles.add(file);
-            }
-            return AjaxResult.success(ddataService.insertDdataInfos(ddataInfo, uploadFiles));
-        } catch (Exception e){
-            return AjaxResult.error(e.getMessage());
+        if (files == null || files.isEmpty()) {
+            return error("请选择要上传的文件");
         }
-    }
 
-    @PostMapping("/insertByPath")
-    @Log(title = "业务数据路径导入", businessType = BusinessType.INSERT)
-    public AjaxResult insertDDataInfoByPath(@RequestBody DdataInfo ddataInfo)
-    {
-        try
-        {
-            return AjaxResult.success(ddataService.insertDdataInfoByPath(ddataInfo));
-        }
-        catch (Exception e)
-        {
-            return AjaxResult.error(e.getMessage());
-        }
-    }
+        files = files.stream()
+                .filter(file -> file != null && !file.isEmpty())
+                .collect(Collectors.toList());
 
-    @PostMapping("/transport")
-    @Log(title = "业务数据文件搬运", businessType = BusinessType.INSERT)
-    public AjaxResult transportDDataFile(@RequestBody DdataInfo ddataInfo)
-    {
-        try
-        {
-            return AjaxResult.success(ddataService.transportDdataFile(ddataInfo));
+        if (files.isEmpty()) {
+            return error("请选择有效文件");
         }
-        catch (Exception e)
-        {
-            return AjaxResult.error(e.getMessage());
+
+        Long userId = SecurityUtils.getUserId();
+        List<UploadedFileInfo> uploadedFileInfoList = new ArrayList<>();
+        for (MultipartFile multipartFile : files){
+            UploadedFileInfo uploadedFileInfo = new UploadedFileInfo();
+            try {
+                String ObjectName = fileStorageService.upload(multipartFile, userId);
+                uploadedFileInfo.setObjectName(ObjectName);
+                uploadedFileInfo.setOriginalFilename(multipartFile.getOriginalFilename());
+                uploadedFileInfo.setContentType(multipartFile.getContentType());
+                uploadedFileInfo.setSize(multipartFile.getSize());
+                uploadedFileInfoList.add(uploadedFileInfo);
+            } catch (RuntimeException e) {
+                log.error("文件上传失败: {}", multipartFile.getOriginalFilename(), e);
+            }
         }
+        if(uploadedFileInfoList.isEmpty()) return error("文件全部上传失败");
+        //落库处理
+        Integer importedCount = ddataService.insertDdataInfosByObjectNames(ddataInfo, uploadedFileInfoList);
+        return success(importedCount);
     }
 
     @PreAuthorize("@ss.hasPermi('dataInfo:info:update')")
@@ -179,12 +168,14 @@ public class DBussinessDataInfoController extends BaseController
     @Log(title = "更新业务数据", businessType = BusinessType.UPDATE)
     public AjaxResult updateDDataInfo(@RequestBody DdataInfo ddataInfo)
     {
-        try {
-            return AjaxResult.success(ddataService.updateDdataInfo(ddataInfo));
+        if (ddataInfo == null || ddataInfo.getId() == null) {
+            return error("数据ID不能为空");
         }
-        catch (Exception e) {
-            throw new ServiceException(e.getMessage());
+        if(ddataService.updateDdataInfo(ddataInfo) == 0){
+            return error("更新失败，请重试");
         }
+        return AjaxResult.success("更新成功");
+    
     }
 
     @PreAuthorize("@ss.hasPermi('dataInfo:info:update')")
@@ -200,23 +191,29 @@ public class DBussinessDataInfoController extends BaseController
     }
 
     @PreAuthorize("@ss.hasPermi('dataInfo:info:delete')")
+    @DeleteMapping("/delete/{id}")
+    @Log(title = "删除业务数据", businessType = BusinessType.DELETE)
+    public AjaxResult deleteDdataInfoById(@PathVariable Integer id){
+        if(id == null){
+            return error("请选择需要删除的数据");
+        }
+        if(ddataService.deleteDataInfoById(id) ==0){
+            return error("删除失败，请重试");
+        }
+        return success("删除成功");
+    }
+
+    @PreAuthorize("@ss.hasPermi('dataInfo:info:delete')")
     @DeleteMapping("/delete")
     @Log(title = "删除业务数据", businessType = BusinessType.DELETE)
     public AjaxResult deleteDdataInfos(@RequestBody List<Integer> ids)
     {
         if (ids == null || ids.isEmpty())
         {
-            throw new ServiceException("请选择要删除的业务数据");
+            return error("请选择要删除的文件");
         }
-
-        try
-        {
-            ddataService.deleteDdataInfos(ids);
-        }
-        catch (Exception e)
-        {
-            return AjaxResult.error(e.getMessage());
-        }
+        if(ddataService.deleteDdataInfos(ids) == 0)
+            return error("删除失败");
         return AjaxResult.success("删除成功");
     }
 
@@ -224,104 +221,59 @@ public class DBussinessDataInfoController extends BaseController
     @PostMapping("/preview")
     public AjaxResult previewDDataInfo(@RequestBody DdataInfo ddataInfo)
     {
-        if (StringUtils.isEmpty(ddataInfo.getExperimentId()) || StringUtils.isEmpty(ddataInfo.getDataFilePath()))
-        {
+        if (ddataInfo == null || ddataInfo.getId() == null) {
+            return error("预览参数不能为空");
+        }
+
+        DdataInfo dataInfo = ddataService.selectDdataInfoByDdataId(ddataInfo.getId());
+        if (dataInfo == null) {
+            return error("数据不存在");
+        }
+        return success(buildStoragePreviewResult(dataInfo, ddataInfo));
+    }
+
+    @PreAuthorize("@ss.hasPermi('dataInfo:info:preview')")
+    @GetMapping("/preview/file/{id}")
+    public void previewDDataInfoFile(@PathVariable Integer id, HttpServletResponse response)
+    {
+        if (id == null) {
             throw new ServiceException("预览参数不能为空");
         }
-        DExperimentInfo experimentInfo = new DExperimentInfo();
-        try {
-            experimentInfo =
-                dExperimentInfoService.selectDExperimentInfoByExperimentId(ddataInfo.getExperimentId());
-        }
-        catch (Exception e) {
-            throw new ServiceException("查询试验信息失败");
-        }
-        if (experimentInfo == null)
-        {
-            throw new ServiceException("试验信息不存在");
+
+        DdataInfo dataInfo = ddataService.selectDdataInfoByDdataId(id);
+        if (dataInfo == null || dataInfo.getStorageFileId() == null) {
+            throw new ServiceException("预览文件不存在");
         }
 
-        DProjectInfo projectInfo = new DProjectInfo();
-        try {
-            projectInfo =
-                dProjectInfoService.selectDProjectInfoByProjectId(experimentInfo.getProjectId());
-        }
-        catch (Exception e) {
-            throw new ServiceException("查询项目信息失败");
-        }
-        if (projectInfo == null)
-        {
-            throw new ServiceException("项目不存在");
+        MdFileStorage mdFileStorage = mdFileStorageMapper.selectById(dataInfo.getStorageFileId());
+        if (mdFileStorage == null || StringUtils.isEmpty(mdFileStorage.getObjectName())) {
+            throw new ServiceException("预览文件不存在");
         }
 
-        int pageNum = ddataInfo.getPageNum() == null || ddataInfo.getPageNum() < 1 ? 1 : ddataInfo.getPageNum();
-        int pageSize =
-                ddataInfo.getPageSize() == null || ddataInfo.getPageSize() < 1
-                        ? DEFAULT_PREVIEW_PAGE_SIZE
-                        : ddataInfo.getPageSize();
-        pageSize = Math.min(pageSize, MAX_PREVIEW_PAGE_SIZE);
-
-        String relativePath = StringUtils.removeStart(ddataInfo.getDataFilePath(), "/");
-        Path projectRoot = buildProjectRoot(projectInfo.getPath());
-        Path experimentRoot = buildExperimentRoot(projectInfo.getPath(), experimentInfo.getPath());
-        Path absolutePath = resolveDataFilePath(experimentRoot, relativePath);
-
-        try (PathLockManager.LockHandle ignored = pathLockManager.lockRead(projectRoot, experimentRoot, absolutePath))
-        {
-            Map<String, Object> previewData =
-                    FileUtils.previewFileByPage(absolutePath.toString(), pageNum, pageSize);
-            return success(previewData);
-        }
+        fileStorageService.preview(
+                mdFileStorage.getObjectName(),
+                mdFileStorage.getOriginalFileName(),
+                mdFileStorage.getContentType(),
+                response
+        );
     }
 
     @PreAuthorize("@ss.hasPermi('dataInfo:info:preview')")
     @PostMapping("/previewAll")
     public AjaxResult previewAllDDataInfo(@RequestBody DdataInfo ddataInfo)
     {
-        if (StringUtils.isEmpty(ddataInfo.getExperimentId()) || StringUtils.isEmpty(ddataInfo.getDataFilePath()))
+        if (ddataInfo == null || ddataInfo.getId() == null)
         {
             throw new ServiceException("预览参数不能为空");
         }
-        DExperimentInfo experimentInfo = new DExperimentInfo();
-        try {
-            experimentInfo =
-                dExperimentInfoService.selectDExperimentInfoByExperimentId(ddataInfo.getExperimentId());
-        }
-        catch (Exception e) {
-            throw new ServiceException("查询试验信息失败");
-        }
-        if (experimentInfo == null)
+
+        DdataInfo dataInfo = ddataService.selectDdataInfoByDdataId(ddataInfo.getId());
+        if (dataInfo == null)
         {
-            throw new ServiceException("试验信息不存在");
+            throw new ServiceException("数据不存在");
         }
 
-        DProjectInfo projectInfo = new DProjectInfo();
-        try {
-            projectInfo =
-                dProjectInfoService.selectDProjectInfoByProjectId(experimentInfo.getProjectId());
-        }
-        catch (Exception e) {
-            throw new ServiceException("查询项目信息失败");
-        }
-        if (projectInfo == null)
-        {
-            throw new ServiceException("项目不存在");
-        }
-
-        String relativePath = StringUtils.removeStart(ddataInfo.getDataFilePath(), "/");
-        Path projectRoot = buildProjectRoot(projectInfo.getPath());
-        Path experimentRoot = buildExperimentRoot(projectInfo.getPath(), experimentInfo.getPath());
-        Path absolutePath = resolveDataFilePath(experimentRoot, relativePath);
-
-        try (PathLockManager.LockHandle ignored = pathLockManager.lockRead(projectRoot, experimentRoot, absolutePath))
-        {
-            Map<String, Object> previewData =
-                    FileUtils.previewFileByPage(absolutePath.toString(), 1, Integer.MAX_VALUE);
-            Object total = previewData.get("total");
-            previewData.put("pageNum", 1);
-            previewData.put("pageSize", total == null ? 0 : total);
-            return success(previewData);
-        }
+        return success(buildStoragePreviewResult(dataInfo, ddataInfo));
     }
 
     @PreAuthorize("@ss.hasPermi('dataInfo:info:download')")
@@ -329,46 +281,118 @@ public class DBussinessDataInfoController extends BaseController
     @Log(title = "下载业务数据文件", businessType = BusinessType.EXPORT)
     public void downloadDDataInfoFile(@RequestBody DdataInfo ddataInfo, HttpServletResponse response)
     {
-        if (StringUtils.isEmpty(ddataInfo.getExperimentId()) || StringUtils.isEmpty(ddataInfo.getDataFilePath()))
+        if (ddataInfo == null || ddataInfo.getId() == null)
         {
             throw new ServiceException("下载参数不能为空");
         }
 
-        DExperimentInfo experimentInfo = new DExperimentInfo();
-        try {
-            experimentInfo =
-                dExperimentInfoService.selectDExperimentInfoByExperimentId(ddataInfo.getExperimentId());
-        }
-        catch (Exception e) {
-            throw new ServiceException("查询试验信息失败");
-        }
-        if (experimentInfo == null)
+        DdataInfo dataInfo = ddataService.selectDdataInfoByDdataId(ddataInfo.getId());
+        if (dataInfo == null)
         {
-            throw new ServiceException("试验信息不存在");
+            throw new ServiceException("数据不存在");
         }
 
-        DProjectInfo projectInfo = new DProjectInfo();
-        try {
-            projectInfo =
-                dProjectInfoService.selectDProjectInfoByProjectId(experimentInfo.getProjectId());
-        }
-        catch (Exception e) {
-            throw new ServiceException("查询项目信息失败");
-        }
-        if (projectInfo == null)
+        if (dataInfo.getStorageFileId() != null)
         {
-            throw new ServiceException("项目不存在");
+            MdFileStorage mdFileStorage = mdFileStorageMapper.selectById(dataInfo.getStorageFileId());
+            if (mdFileStorage != null && StringUtils.isNotEmpty(mdFileStorage.getObjectName()))
+            {
+                fileStorageService.download(
+                        mdFileStorage.getObjectName(),
+                        StringUtils.defaultIfBlank(mdFileStorage.getOriginalFileName(), dataInfo.getDataName()),
+                        response
+                );
+            }
+        }
+    }
+
+    private Map<String, Object> buildStoragePreviewResult(DdataInfo dataInfo, DdataInfo requestData)
+    {
+        if (dataInfo.getStorageFileId() == null)
+        {
+            throw new ServiceException("预览文件不存在");
         }
 
-        String relativePath = StringUtils.removeStart(ddataInfo.getDataFilePath(), "/");
-        Path projectRoot = buildProjectRoot(projectInfo.getPath());
-        Path experimentRoot = buildExperimentRoot(projectInfo.getPath(), experimentInfo.getPath());
-        Path absolutePath = resolveDataFilePath(experimentRoot, relativePath);
-
-        try (PathLockManager.LockHandle ignored = pathLockManager.lockRead(projectRoot, experimentRoot, absolutePath))
+        MdFileStorage mdFileStorage = mdFileStorageMapper.selectById(dataInfo.getStorageFileId());
+        if (mdFileStorage == null || StringUtils.isEmpty(mdFileStorage.getObjectName()))
         {
-            FileUtils.downloadFile(absolutePath.toString(), FileUtils.getName(relativePath), response);
+            throw new ServiceException("预览文件不存在");
         }
+
+        String originalFileName = StringUtils.defaultIfBlank(mdFileStorage.getOriginalFileName(), dataInfo.getDataName());
+        String lowerFileName = originalFileName == null ? "" : originalFileName.toLowerCase(Locale.ROOT);
+        if (isBinaryPreviewExtension(lowerFileName))
+        {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("previewType", "unsupported");
+            result.put("message", "暂不支持预览二进制文件，请下载后查看");
+            result.put("rows", new ArrayList<>());
+            result.put("total", 0);
+            result.put("pageNum", 1);
+            result.put("pageSize", 0);
+            result.put("fileName", originalFileName);
+            return result;
+        }
+
+        if (isInlinePreviewExtension(lowerFileName))
+        {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("previewType", resolveInlinePreviewType(lowerFileName));
+            result.put("mimeType", StringUtils.defaultIfBlank(mdFileStorage.getContentType(), MediaType.APPLICATION_OCTET_STREAM_VALUE));
+            result.put("message", "");
+            result.put("url", "/data/bussiness/preview/file/" + dataInfo.getId());
+            result.put("rows", new ArrayList<>());
+            result.put("total", 1);
+            result.put("pageNum", 1);
+            result.put("pageSize", 1);
+            result.put("fileName", originalFileName);
+            return result;
+        }
+
+        int pageNum = requestData == null || requestData.getPageNum() == null ? 1 : requestData.getPageNum();
+        int pageSize = requestData == null || requestData.getPageSize() == null ? 200 : requestData.getPageSize();
+        Map<String, Object> result = fileStorageService.previewByPage(
+                mdFileStorage.getObjectName(),
+                originalFileName,
+                pageNum,
+                pageSize
+        );
+        result.put("fileName", originalFileName);
+        return result;
+    }
+
+    private boolean isInlinePreviewExtension(String lowerFileName)
+    {
+        return lowerFileName.endsWith(".pdf")
+                || lowerFileName.endsWith(".jpg")
+                || lowerFileName.endsWith(".jpeg")
+                || lowerFileName.endsWith(".png")
+                || lowerFileName.endsWith(".mp3")
+                || lowerFileName.endsWith(".mp4");
+    }
+
+    private boolean isBinaryPreviewExtension(String lowerFileName)
+    {
+        return lowerFileName.endsWith(".bin")
+                || lowerFileName.endsWith(".dat")
+                || lowerFileName.endsWith(".raw");
+    }
+
+    private String resolveInlinePreviewType(String lowerFileName)
+    {
+        if (lowerFileName.endsWith(".pdf"))
+        {
+            return "pdf";
+        }
+        if (lowerFileName.endsWith(".mp3"))
+        {
+            return "audio";
+        }
+        if (lowerFileName.endsWith(".mp4"))
+        {
+            return "video";
+        }
+        return "image";
     }
 
     @PreAuthorize("@ss.hasPermi('dataInfo:info:Rename')")
@@ -378,13 +402,13 @@ public class DBussinessDataInfoController extends BaseController
     {
         if (ddataInfo.isEmpty())
         {
-            throw new ServiceException("规范重命名参数不能为空");
+            return AjaxResult.error("规范重命名参数不能为空");
         }
         for (DdataInfo ddataInfoItem : ddataInfo)
         {
             if (StringUtils.isEmpty(ddataInfoItem.getExperimentId()) || StringUtils.isEmpty(ddataInfoItem.getDataName()))
             {
-                throw new ServiceException("规范重命名参数不能为空");
+                return AjaxResult.error("规范重命名参数不能为空");
             }
         }
         //重命名数据文件，数据名称后添加项目、试验名称
@@ -443,7 +467,7 @@ public class DBussinessDataInfoController extends BaseController
         return ResponseEntity.ok(healthy);
     }
 
-    @Anonymous
+   @Anonymous
     @PostMapping("/dbMgt/saveICDData")
     public ResponseEntity<Healthy> insertData(@RequestBody ICDRequest icdRequest) {
         Healthy healthy = new Healthy();
@@ -469,7 +493,7 @@ public class DBussinessDataInfoController extends BaseController
         DExperimentInfo dExperimentInfo = new DExperimentInfo();
         dProjectInfo.setProjectName(icdRequest.getProjectInfo().getProjectName());
         dProjectInfo.setProjectContentDesc(icdRequest.getProjectInfo().getProjectDesc());
-        dProjectInfo.setPath(icdRequest.getProjectInfo().getProjectPath());
+        dProjectInfo.setPath("/" + icdRequest.getProjectInfo().getProjectName());
         DProjectInfo oldProjectInfo = dProjectInfoMapper.selectSameNameProject(dProjectInfo.getProjectName());
         if(oldProjectInfo == null){
             dProjectInfoMapper.insertDProjectInfo(dProjectInfo);
@@ -509,7 +533,7 @@ public class DBussinessDataInfoController extends BaseController
 
     @Anonymous
     @PostMapping("/dbMgt/dataQuery")
-    public ResponseEntity<List<ICDRequest>> getData(@RequestBody DataQuery dataQuery) {
+    public ResponseEntity<Map<String, List<ICDRequest>>> getData(@RequestBody DataQuery dataQuery) {
         //search from database
         //SELECT * FROM D_PROJECT_INFO dpi, D_EXPERIMENT_INFO dei, D_TARGET_INFO dti , MD_DATA_RELATION mdr
         //WHERE dpi.PROJECT_ID  = dei.PROJECT_ID
@@ -521,9 +545,10 @@ public class DBussinessDataInfoController extends BaseController
 
         List<ICDRequest> list = new ArrayList<>();
         List<Map<String, Object>> queryResult = ddataMapper.selectIcdDataQueryList(dataQuery);
+        Map<String, List<ICDRequest>> map = new HashMap<>();
 
         if (queryResult == null || queryResult.isEmpty()) {
-            return ResponseEntity.ok(list);
+            return ResponseEntity.ok(map);
         }
 
         ICDRequest icdRequest = new ICDRequest();
@@ -559,8 +584,9 @@ public class DBussinessDataInfoController extends BaseController
         icdRequest.setDataRelation(dataRelationList);
 
         list.add(icdRequest);
+        map.put("data", list);
 
-        return ResponseEntity.ok(list);
+        return ResponseEntity.ok(map);
     }
 
 

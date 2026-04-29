@@ -568,7 +568,16 @@ const COORDINATE_RULES = [
   { key: 'lat', label: '\u7eac\u5ea6', min: -90, max: 90, unit: 'deg' },
   { key: 'alt', label: '\u9ad8\u5ea6', min: -1000, max: 50000, unit: 'm' }
 ]
-
+const DEFAULT_START_COORDINATE = {
+  lon: 121.47,
+  lat: 31.23,
+  alt: 0
+}
+const DEFAULT_END_COORDINATE = {
+  lon: 121.50,
+  lat: 24.0,
+  alt: 1000
+}
 const motionModelOptions = ['直线模型', '盘旋模型', '折线模型', '机动模型']
 const simulationTabs = [
   { code: 'INS', label: '载机惯导信息', showDataSource: false, showTargetNum: false },
@@ -769,13 +778,21 @@ const filteredSimulationExperiments = computed(() => {
 
 const deleteDisabled = computed(() => selectedTaskRows.value.length === 0)
 
-function createCoordinate() {
+function createStartCoordinate() {
   return {
-    lon: null,
-    lat: null,
-    alt: null
+    lon: DEFAULT_START_COORDINATE.lon,
+    lat: DEFAULT_START_COORDINATE.lat,
+    alt: DEFAULT_START_COORDINATE.alt
   }
 }
+function createEndCoordinate() {
+  return {
+    lon: DEFAULT_END_COORDINATE.lon,
+    lat: DEFAULT_END_COORDINATE.lat,
+    alt: DEFAULT_END_COORDINATE.alt
+  }
+}
+
 
 function randomFloat(min, max, precision = 2) {
   return (Math.random() * (max - min) + min).toFixed(precision)
@@ -954,8 +971,8 @@ function createSimulationForm() {
     projectId: undefined,
     experimentId: undefined,
     motionModel: motionModelOptions[0],
-    startCoordinate: createCoordinate(),
-    endCoordinate: createCoordinate(),
+    startCoordinate: createStartCoordinate(),
+    endCoordinate: createEndCoordinate(),
     tabs
   }
 }

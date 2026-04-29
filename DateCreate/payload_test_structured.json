@@ -1,0 +1,48 @@
+{
+  "request_id": "payload_test_structured",
+  "basic": {
+    "motion_model": "straight",
+    "start_coords": {
+      "lon": 120.000000,
+      "lat": 30.000000,
+      "alt": 1000.0
+    },
+    "end_coords": {
+      "lon": 120.120000,
+      "lat": 30.080000,
+      "alt": 1800.0
+    }
+  },
+  "datasets": {
+    "aircraft_inertial": {
+      "enabled": true,
+      "filename": "aircraft_inertial_test.csv",
+      "flight_start_datetime": "2026-04-07 10:00:00.000",
+      "flight_end_datetime": "2026-04-07 10:05:00.000",
+      "sample_rate_hz": 2
+    },
+    "attitude": {
+      "enabled": true,
+      "filename": "attitude_test.csv",
+      "flight_start_datetime": "2026-04-07 10:00:00.000",
+      "flight_end_datetime": "2026-04-07 10:05:00.000",
+      "sample_rate_hz": 2
+    },
+    "radar_track": {
+      "enabled": true,
+      "filename": "radar_track_test.csv",
+      "flight_start_datetime": "2026-04-07 10:00:00.000",
+      "flight_end_datetime": "2026-04-07 10:05:00.000",
+      "sample_rate_hz": 1,
+      "enemy_num": 12
+    },
+    "ads_b": {
+      "enabled": true,
+      "filename": "ads_b_test.csv",
+      "flight_start_datetime": "2026-04-07 10:00:00.000",
+      "flight_end_datetime": "2026-04-07 10:05:00.000",
+      "sample_rate_hz": 1,
+      "friendly_num": 2
+    }
+  }
+}

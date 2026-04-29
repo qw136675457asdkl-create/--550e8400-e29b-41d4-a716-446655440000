@@ -119,14 +119,7 @@ public class DExperimentInfoController extends BaseController
             dProjectInfo.setProjectName(treeTableVo.getName());
             dProjectInfo.setCreateBy(NickNameUtil.getNickName());
             dProjectInfo.setProjectContentDesc(treeTableVo.getContentDesc());
-            try
-            {
-                return toAjax(dProjectInfoService.insertDProjectInfo(dProjectInfo));
-            }
-            catch (Exception e)
-            {
-                throw buildSafeException("新增项目信息失败", e);
-            }
+            return toAjax(dProjectInfoService.insertDProjectInfo(dProjectInfo));
         }else{
             return AjaxResult.error("新增项目信息失败");
         }

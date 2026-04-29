@@ -21,6 +21,7 @@ public class Task extends BaseEntity {
     private String targetType;
     private String status;
     private String path;
+    private Long createUserId;
     private List<TaskDataGroup> dataGroups = new ArrayList<>();
     private List<TaskDataGroup> requestDataGroups = new ArrayList<>();
 
@@ -166,5 +167,12 @@ public class Task extends BaseEntity {
 
     public void setRequestDataGroups(List<TaskDataGroup> requestDataGroups) {
         this.requestDataGroups = requestDataGroups == null ? new ArrayList<>() : requestDataGroups;
+    }
+
+    public void setCreateUserId(Long createUserId){
+        this.createUserId = createUserId;
+    }
+    public Long getCreateUserID(){
+        return createUserId;
     }
 }

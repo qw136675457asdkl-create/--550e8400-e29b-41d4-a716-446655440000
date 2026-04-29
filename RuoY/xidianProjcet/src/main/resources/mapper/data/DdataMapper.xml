@@ -18,7 +18,7 @@
         <result column="project_name" property="projectName" />
         <result column="data_name" property="dataName" />
         <result column="data_type" property="dataType" />
-        <result column="data_file_path" property="dataFilePath" />
+        <result column="storage_file_id" property="storageFileId" />
         <result column="device_id" property="deviceId" />
         <result column="device_info" property="deviceInfo" />
         <result column="sample_frequency" property="sampleFrequency" />
@@ -36,7 +36,7 @@
             experiment_id,
             data_name,
             data_type,
-            data_file_path,
+            storage_file_id,
             device_id,
             device_info,
             sample_frequency,
@@ -51,7 +51,7 @@
             #{experimentId},
             #{dataName},
             #{dataType},
-            #{dataFilePath},
+            #{storageFileId},
             #{deviceId},
             #{deviceInfo},
             #{sampleFrequency},
@@ -69,7 +69,6 @@
         experiment_id = #{experimentId},
         data_name = #{dataName},
         data_type = #{dataType},
-        data_file_path = #{dataFilePath},
         device_id = #{deviceId},
         device_info = #{deviceInfo},
         sample_frequency = #{sampleFrequency},
@@ -85,6 +84,11 @@
             where id = #{item.id}
         </foreach>
     </update>
+    <update id="updateStorageFileId">
+        UPDATE SYSTEM_COLLABORATION_TEST.md_data_relation
+        SET storage_file_id = #{storageFileId}
+        WHERE id = #{id}
+    </update>
     <delete id="deleteDdataInfos">
         DELETE FROM SYSTEM_COLLABORATION_TEST.md_data_relation WHERE id IN
         <foreach collection="list" item="id" open="(" close=")" separator=",">
@@ -97,7 +101,7 @@
         d.data_name,
         d.data_type,
         d.is_simulation,
-        d.data_file_path,
+        d.storage_file_id,
         d.target_id,
         d.target_type,
         d.target_category,
@@ -124,7 +128,6 @@
             <if test="projectId != null and projectId != ''"> AND p.project_id = #{projectId} </if>
             <if test="experimentId != null and experimentId != ''">AND d.experiment_id = #{experimentId} </if>
             <if test="experimentName != null and experimentName != ''"> AND e.experiment_name LIKE concat('%', #{experimentName}, '%') </if>
-            <if test="dataFilePath != null and dataFilePath != ''"> AND d.data_file_path = #{dataFilePath} </if>
             <if test="createBy != null and createBy != ''"> AND e.create_by = #{createBy} </if>
             <if test="isSimulation != null"> AND d.is_simulation = #{isSimulation} </if>
             <if test="workStatus != null and workStatus != ''"> AND d.work_status = #{workStatus} </if>
@@ -145,7 +148,7 @@
             e.path AS experimentPath,
             d.data_name AS dataName,
             d.data_type AS dataType,
-            d.data_file_path AS dataFilePath
+            d.storage_file_id AS storageFileId
         FROM SYSTEM_COLLABORATION_TEST.md_data_relation d
         INNER JOIN SYSTEM_COLLABORATION_TEST.d_experiment_info e ON d.experiment_id = e.experiment_id
         INNER JOIN SYSTEM_COLLABORATION_TEST.d_project_info p ON e.project_id = p.project_id
@@ -168,7 +171,7 @@
             d.data_name,
             d.data_type,
             d.is_simulation,
-            d.data_file_path,
+            d.storage_file_id,
             d.target_id,
             d.target_type,
             d.target_category,
@@ -193,7 +196,7 @@
         d.data_name,
         d.data_type,
         d.is_simulation,
-        d.data_file_path,
+        d.storage_file_id,
         d.target_id,
         d.target_type,
         d.target_category,
@@ -210,6 +213,11 @@
         e.content_desc
         FROM SYSTEM_COLLABORATION_TEST.md_data_relation d
         LEFT JOIN SYSTEM_COLLABORATION_TEST.d_experiment_info e ON d.experiment_id = e.experiment_id
-        WHERE d.experiment_id = #{experimentId} AND d.data_file_path = #{dataFilePath}
+        WHERE d.experiment_id = #{experimentId}
+    </select>
+    <select id="countByExperimentId" resultType="int">
+        SELECT COUNT(1)
+        FROM SYSTEM_COLLABORATION_TEST.md_data_relation
+        WHERE experiment_id = #{experimentId}
     </select>
 </mapper>

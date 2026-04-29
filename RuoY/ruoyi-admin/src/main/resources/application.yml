@@ -7,7 +7,7 @@ ruoyi:
   # 版权年份
   copyrightYear: 2026
   # 文件路径 示例
-  profile: /home/hyy12
+  profile: /home/hyy1208
 
   # 备份目录
   backupDir: /home/hyy1208/backupdata
@@ -65,6 +65,8 @@ spring:
   messages:
     # 国际化资源文件路径
     basename: i18n/messages
+  config:
+    import: optional:classpath:application-minio.yml
   profiles:
     active: druid
   # 文件上传
@@ -110,6 +112,12 @@ token:
   secret: abcdefghijklmnopqrstuvwxyz
   # 令牌有效期
   expireTime: 60
+
+minio:
+  endpoint: ${secure.minio.endpoint}
+  access-key: ${secure.minio.access-key}
+  secret-key: ${secure.minio.secret-key}
+  bucket: ${secure.minio.bucket}
 
 # MyBatis配置
 mybatis:

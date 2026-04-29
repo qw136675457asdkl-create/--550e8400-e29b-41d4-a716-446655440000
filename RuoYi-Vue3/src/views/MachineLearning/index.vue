@@ -36,7 +36,6 @@
                 <el-button
                   type="primary"
                   :loading="pythonRunner.loading"
-                  v-hasPermi="['system:machineLearning:execute']"
                   @click="runPythonExecutor"
                 >
                   发送代码
@@ -134,7 +133,6 @@
                 <el-button
                   type="primary"
                   :loading="matlabRunner.loading"
-                  v-hasPermi="['system:machineLearning:execute']"
                   @click="runMatlabExecutor"
                 >
                   发送代码
@@ -407,8 +405,8 @@
       </el-row>
 
       <el-form-item class="action-bar">
-        <el-button type="primary" @click="submitForm" v-hasPermi="['system:machineLearning:save']">保存环境配置</el-button>
-        <el-button @click="resetForm" v-hasPermi="['system:machineLearning:reset']">恢复默认配置</el-button>
+        <el-button type="primary" @click="submitForm">保存环境配置</el-button>
+        <el-button @click="resetForm">恢复默认配置</el-button>
       </el-form-item>
     </el-form>
   </div>
@@ -417,7 +415,6 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { checkPermi } from '@/utils/permission'
 import {
   cancelMatlabTask,
   executeMatlabCode,
@@ -432,16 +429,6 @@ const DEFAULT_PYTHON_PATH = '/usr/local/python313/bin/python3.13'
 const DEFAULT_PYTHON_VERSION = 'Python 3.13'
 const DEFAULT_MATLAB_PATH = '/usr/local/bin/matlab'
 const DEFAULT_MATLAB_VERSION = 'R2024A'
-const MACHINE_LEARNING_PERMISSION = Object.freeze({
-  execute: 'system:machineLearning:execute',
-  save: 'system:machineLearning:save',
-  reset: 'system:machineLearning:reset'
-})
-const MACHINE_LEARNING_LOAD_PERMISSIONS = Object.freeze([
-  MACHINE_LEARNING_PERMISSION.execute,
-  MACHINE_LEARNING_PERMISSION.save,
-  MACHINE_LEARNING_PERMISSION.reset
-])
 
 const DEFAULT_PYTHON_CODE = `print("Hello, World!")
 for i in range(3):
@@ -717,18 +704,6 @@ function buildResultMeta(runner) {
   return parts.join(' · ')
 }
 
-function ensurePermission(permission, message) {
-  if (checkPermi([permission])) {
-    return true
-  }
-  ElMessage.error(message)
-  return false
-}
-
-function hasAnyPermission(permissions) {
-  return permissions.some((permission) => checkPermi([permission]))
-}
-
 async function handleRunnerFailure(failureHandler) {
   if (typeof failureHandler !== 'function') {
     return
@@ -787,16 +762,10 @@ async function executeRunner(runner, languageLabel, executor, failureHandler) {
 }
 
 function runPythonExecutor() {
-  if (!ensurePermission(MACHINE_LEARNING_PERMISSION.execute, '暂无代码执行权限')) {
-    return Promise.resolve()
-  }
   return executeRunner(pythonRunner, 'Python', executePythonCode)
 }
 
 function runMatlabExecutor() {
-  if (!ensurePermission(MACHINE_LEARNING_PERMISSION.execute, '暂无代码执行权限')) {
-    return Promise.resolve()
-  }
   return executeRunner(matlabRunner, 'Matlab', executeMatlabCode, cancelMatlabTask)
 }
 
@@ -807,9 +776,6 @@ function applyMatlabExample(type) {
 }
 
 function submitForm() {
-  if (!ensurePermission(MACHINE_LEARNING_PERMISSION.save, '暂无保存权限')) {
-    return
-  }
   formRef.value.validate((valid) => {
     if (!valid) {
       return
@@ -831,9 +797,6 @@ function submitForm() {
 }
 
 function resetForm() {
-  if (!ensurePermission(MACHINE_LEARNING_PERMISSION.reset, '暂无重置权限')) {
-    return
-  }
   ElMessageBox.confirm('确定要恢复默认配置吗？', '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
@@ -858,11 +821,6 @@ function resetForm() {
 }
 
 function loadConfiguration() {
-  Object.assign(formData, createDefaultFormData())
-  if (!hasAnyPermission(MACHINE_LEARNING_LOAD_PERMISSIONS)) {
-    return
-  }
-
   loading.value = true
   getMachineLearningConfiguration()
     .then((res) => {

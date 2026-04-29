@@ -22,8 +22,6 @@
         <result column="work_status" property="workStatus"/>
         <result column="is_simulation" property="isSimulation"/>
         <result column="ext_attr" property="extAttr"/>
-        <result column="source_path" property="sourcePath"/>
-        <result column="backup_file_path" property="backupFilePath"/>
         <result column="delete_by" property="deleteBy"/>
         <result column="delete_time" property="deleteTime"/>
         <result column="restore_by" property="restoreBy"/>
@@ -53,8 +51,6 @@
     sample_frequency,
     work_status,
     is_simulation,
-    source_path,
-    backup_file_path,
     delete_by,
     delete_time,
     restore_by,
@@ -85,8 +81,6 @@
             sample_frequency,
             work_status,
             is_simulation,
-            source_path,
-            backup_file_path,
             delete_by,
             delete_time,
             restore_by,
@@ -115,8 +109,6 @@
             #{sampleFrequency},
             #{workStatus},
             #{isSimulation},
-            #{sourcePath},
-            #{backupFilePath},
             #{deleteBy},
             #{deleteTime},
             #{restoreBy},
@@ -149,8 +141,6 @@
             <if test="sampleFrequency != null">sample_frequency = #{sampleFrequency},</if>
             <if test="workStatus != null and workStatus != ''">work_status = #{workStatus},</if>
             <if test="isSimulation != null">is_simulation = #{isSimulation},</if>
-            <if test="sourcePath != null and sourcePath != ''">source_path = #{sourcePath},</if>
-            <if test="backupFilePath != null and backupFilePath != ''">backup_file_path = #{backupFilePath},</if>
             <if test="deleteBy != null and deleteBy != ''">delete_by = #{deleteBy},</if>
             <if test="deleteTime != null">delete_time = #{deleteTime},</if>
             <if test="restoreBy != null and restoreBy != ''">restore_by = #{restoreBy},</if>
@@ -208,12 +198,6 @@
             </if>
             <if test="dataType != null and dataType != ''">
                 and data_type = #{dataType}
-            </if>
-            <if test="sourcePath != null and sourcePath != ''">
-                and source_path like concat('%', #{sourcePath}, '%')
-            </if>
-            <if test="backupFilePath != null and backupFilePath != ''">
-                and backup_file_path like concat('%', #{backupFilePath}, '%')
             </if>
             <if test="isSimulation != null">
                 and is_simulation = #{isSimulation}

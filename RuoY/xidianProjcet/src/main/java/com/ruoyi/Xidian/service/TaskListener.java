@@ -2,15 +2,21 @@ package com.ruoyi.Xidian.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ruoyi.Xidian.config.MinioProperties;
 import com.ruoyi.Xidian.config.SimulationTaskStreamProperties;
 import com.ruoyi.Xidian.domain.Coordinate;
 import com.ruoyi.Xidian.domain.DTO.TaskToPy;
+import com.ruoyi.Xidian.domain.MdFileStorage;
 import com.ruoyi.Xidian.domain.Task;
 import com.ruoyi.Xidian.domain.TaskDataGroup;
+import com.ruoyi.Xidian.domain.enums.FileStorageStatusEnum;
+import com.ruoyi.Xidian.domain.enums.MinioBusinessTypeEnum;
 import com.ruoyi.Xidian.domain.enums.TaskStatusEnum;
+import com.ruoyi.Xidian.mapper.MdFileStorageMapper;
 import com.ruoyi.Xidian.mapper.TaskDataGroupMapper;
 import com.ruoyi.Xidian.mapper.TaskMapper;
 import com.ruoyi.common.core.domain.entity.SysUser;
+import com.ruoyi.common.core.redis.RedisCache;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.framework.web.service.WebSocketServer;
@@ -70,10 +76,17 @@ public class TaskListener implements SmartLifecycle
     @Autowired
     private ObjectMapper objectMapper;
     @Autowired
+    private MdFileStorageMapper mdFileStorageMapper;
+    @Autowired
     private SimulationTaskStreamQueue simulationTaskStreamQueue;
     @Autowired
     private SimulationTaskStreamProperties streamProperties;
-
+    @Autowired
+    private FileStorageService fileStorageService;
+    @Autowired
+    private MinioProperties minioProperties;
+    @Autowired
+    private RedisCache redisCache;
     @Resource(name = "threadPoolTaskExecutor")
     private ThreadPoolTaskExecutor threadPoolTaskExecutor;
 
@@ -254,7 +267,6 @@ public class TaskListener implements SmartLifecycle
             acknowledgeAndDeleteTaskRecord(record);
             return;
         }
-
         try
         {
             processTask(task);
@@ -263,6 +275,9 @@ public class TaskListener implements SmartLifecycle
         }
         catch (Exception exception)
         {
+            //TODO:删除仿真失败后的文件和数据库
+            
+            log.error("任务仿真失败,taskId={}"+ exception.getMessage(),task.getId());
             onTaskProcessingFailure(task, retryCount, record, exception);
         }
     }
@@ -290,25 +305,41 @@ public class TaskListener implements SmartLifecycle
         String directory = getFilePath(taskResponse, "directory");
         log.info("Python output directory resolved, taskId={}, directory={}", task.getId(), directory);
 
-        List<String> storedFileNames = new ArrayList<>();
-        String targetPath = dExperimentInfoService.getExperimentPath(task.getExperimentId());
         List<String> fileLists = new ArrayList<>();
         try (Stream<Path> stream = Files.list(Paths.get(directory)))
         {
             stream.filter(Files::isRegularFile)
                     .forEach(path -> fileLists.add(path.getFileName().toString()));
         }
-
+        SysUser user = sysUserService.selectUserById(task.getCreateUserID());
+        List<MdFileStorage> mdFileStorageList = new ArrayList<>();
+        MdFileStorage mdFileStorage = new MdFileStorage();
+        mdFileStorage.setBucketName(minioProperties.getBucket());
+        mdFileStorage.setUploadUserId(user.getUserId());
+        mdFileStorage.setBusinessType(MinioBusinessTypeEnum.DATA_RELATION.getCode());
+        mdFileStorage.setCreateBy(task.getCreateBy());
+        mdFileStorage.setStorageProvider("MINIO");
+        mdFileStorage.setUploadStatus(FileStorageStatusEnum.INIT.getCode());
+        mdFileStorage.setUploadUserId(user.getUserId());
         for (String sourceName : fileLists)
         {
             String sourceFile = directory + "/" + sourceName;
-            log.info("Copy simulation file, taskId={}, sourceFile={}, targetPath={}", task.getId(), sourceFile, targetPath);
-            storedFileNames.add(copyFile(sourceFile, targetPath, sourceName));
+            mdFileStorage.setOriginalFileName(sourceName);
+            String objectName = fileStorageService.uploadLocalFile(sourceFile, user.getUserId());
+            mdFileStorage.setObjectName(objectName);
+            Path path = Paths.get(sourceFile);
+            mdFileStorage.setFileSize(Files.size(path));
+            mdFileStorage.setContentType(Files.probeContentType(path));
+            mdFileStorage.setFileExt(sourceName.substring(sourceName.lastIndexOf(".")));
+            mdFileStorage.setCreateTime(new Date());
+            mdFileStorageMapper.insertMdFileStorage(mdFileStorage);
+            mdFileStorageList.add(mdFileStorage);
+            log.info("Copy simulation file, taskId={}, sourceFile={},objectName={}", task.getId(), sourceFile,objectName);
             deleteFile(sourceFile);
         }
         deleteFile(directory);
         log.info("Simulation files copied and source directory removed, taskId={}, copiedCount={}",
-                task.getId(), storedFileNames.size());
+                task.getId(), mdFileStorageList.size());
         List<TaskDataGroup> taskDataGroupList = new ArrayList<>();
         for(TaskDataGroup taskDataGroup:task.getDataGroups()){
             if(taskDataGroup.getEnabled() == true){
@@ -318,7 +349,7 @@ public class TaskListener implements SmartLifecycle
 
         iDdataService.syncSimulationResultFiles(
                 task.getExperimentId(),
-                storedFileNames,
+                mdFileStorageList,
                 fileLists,
                 task.getCreateBy(),
                 task.getDataCategorySummary(),taskDataGroupList);
@@ -742,7 +773,7 @@ public class TaskListener implements SmartLifecycle
             return;
         }
 
-        SysUser user = sysUserService.selectUserByNickName(task.getCreateBy());
+        SysUser user = sysUserService.selectUserById(task.getCreateUserID());
         if (user == null || user.getUserId() == null)
         {
             log.info("Skip task summary notification because user is missing, taskId={}, createBy={}", taskId, task.getCreateBy());

@@ -72,11 +72,12 @@ export function updatedata(data) {
   })
 }
 
-export function deldata(ids) {
+export function deldata(data) {
+  const isBatchDelete = Array.isArray(data)
   return request({
-    url: '/data/bussiness/delete',
+    url: isBatchDelete ? '/data/bussiness/delete' : `/data/bussiness/delete/${data}`,
     method: 'delete',
-    data: ids
+    ...(isBatchDelete ? { data } : {})
   })
 }
 
@@ -101,11 +102,38 @@ export function adddata(data, config = {}) {
   return request(requestConfig)
 }
 
+export function initiateBusinessDataUpload(data, config = {}) {
+  return request({
+    url: '/minio/direct-upload/initiate',
+    method: 'post',
+    data,
+    ...config
+  })
+}
+
+export function completeBusinessDataUpload(data, config = {}) {
+  return request({
+    url: '/minio/direct-upload/complete',
+    method: 'post',
+    data,
+    ...config
+  })
+}
+
 export function previewData(data) {
   return request({
     url: '/data/bussiness/preview',
     method: 'post',
     data: data
+  })
+}
+
+export function previewFile(url, config = {}) {
+  return request({
+    url,
+    method: 'get',
+    responseType: 'blob',
+    ...config
   })
 }
 

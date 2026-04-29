@@ -34,11 +34,6 @@ public class DProjectInfoServiceImpl implements IDProjectInfoService
     @Autowired
     private RedisCache redisCache;
 
-    @Autowired
-    private PathLockManager pathLockManager;
-
-    private final String profile = RuoYiConfig.getProfile() + "/data";
-
     @Override
     public DProjectInfo selectDProjectInfoByProjectId(Long projectId)
     {
@@ -55,45 +50,34 @@ public class DProjectInfoServiceImpl implements IDProjectInfoService
     }
 
     @Override
-    public List<DProjectInfo> selectDProjectInfoList(DProjectInfo dProjectInfo)
-    {
-        return dProjectInfoMapper.selectDProjectInfoList(dProjectInfo);
-    }
-
-    @Override
     public int insertDProjectInfo(DProjectInfo dProjectInfo)
     {
         String projectName = dProjectInfo.getProjectName();
-        if (projectName == null || !projectName.matches("^[a-zA-Z0-9_\\-\\u4e00-\\u9fa5]+$"))
+
+        if (projectName != null)
+        {
+            projectName = projectName.trim();
+            dProjectInfo.setProjectName(projectName);
+        }
+
+        if (projectName == null || projectName.isEmpty()
+                || !projectName.matches("^[a-zA-Z0-9_\\-\\u4e00-\\u9fa5]+$"))
         {
             throw new ServiceException("项目名称无效");
         }
 
-        String pathStr = projectName;
-        while (true)
+        if (dProjectInfoMapper.selectSameNameProject(projectName) != null)
         {
-            Path path = buildProjectRootPath("/" + pathStr);
-            try (PathLockManager.LockHandle ignored = pathLockManager.lockWrite(path))
-            {
-                if (dProjectInfoMapper.selectSameNameProject(dProjectInfo.getProjectName())!=null||Files.exists(path))
-                {
-                    throw new ServiceException("项目名称重复");
-                }
-
-                try
-                {
-                    Files.createDirectories(path);
-                }
-                catch (IOException e)
-                {
-                    throw new ServiceException("创建项目目录失败: " + e.getMessage());
-                }
-
-                dProjectInfo.setPath("/" + pathStr);
-                log.info("新增项目, projectName={}", dProjectInfo.getProjectName());
-                return dProjectInfoMapper.insertDProjectInfo(dProjectInfo);
-            }
+            throw new ServiceException("项目名称重复");
         }
+
+        // 暂时不操作真实文件系统，仅保存假路径
+        String fakePath = "/" + projectName;
+        dProjectInfo.setPath(fakePath);
+
+        log.info("新增项目, projectName={}, fakePath={}", projectName, fakePath);
+
+        return dProjectInfoMapper.insertDProjectInfo(dProjectInfo);
     }
 
     @Override
@@ -105,37 +89,26 @@ public class DProjectInfoServiceImpl implements IDProjectInfoService
             throw new ServiceException("项目不存在");
         }
 
+        if (dProjectInfo.getPath() == null || dProjectInfo.getPath().trim().isEmpty())
+        {
+            dProjectInfo.setPath(oldProjectInfo.getPath());
+        }
+
         if (!dProjectInfo.getPath().startsWith("/")
                 || !dProjectInfo.getPath().substring(1).matches("^[a-zA-Z0-9_\\-\\u4e00-\\u9fa5]+$"))
         {
             throw new ServiceException("项目路径无效");
         }
 
-        Path oldPath = buildProjectRootPath(oldProjectInfo.getPath());
-        Path newPath = buildProjectRootPath(dProjectInfo.getPath());
-
-        try (PathLockManager.LockHandle ignored = pathLockManager.lockWrite(oldPath, newPath))
-        {
-            if (!oldPath.equals(newPath))
-            {
-                if (Files.exists(newPath))
-                {
-                    throw new ServiceException("目标路径已存在");
-                }
-                try
-                {
-                    Files.move(oldPath, newPath);
-                }
-                catch (IOException e)
-                {
-                    throw new ServiceException("更新项目目录失败: " + e.getMessage());
-                }
-            }
-        }
-
+        // 暂时不移动/创建/检查真实目录，仅更新数据库中的 path
         redisCache.deleteObject(CacheConstants.PROJECT_INFO_KEY + dProjectInfo.getProjectId());
         dProjectInfo.setUpdateTime(DateUtils.getNowDate());
-        log.info("更新项目, projectId={}", dProjectInfo.getProjectId());
+
+        log.info("更新项目, projectId={}, oldPath={}, newPath={}",
+                dProjectInfo.getProjectId(),
+                oldProjectInfo.getPath(),
+                dProjectInfo.getPath());
+
         return dProjectInfoMapper.updateDProjectInfo(dProjectInfo);
     }
 
@@ -146,6 +119,7 @@ public class DProjectInfoServiceImpl implements IDProjectInfoService
         {
             return 0;
         }
+
         if (projectIds[0] == 0)
         {
             return 1;
@@ -163,45 +137,17 @@ public class DProjectInfoServiceImpl implements IDProjectInfoService
                 continue;
             }
 
-            Path projectPath = buildProjectRootPath(projectInfo.getPath());
-            try (PathLockManager.LockHandle ignored = pathLockManager.lockWrite(projectPath))
+            // 暂时不检查、不删除真实项目目录，仅删除数据库记录
+            int rows = dProjectInfoMapper.deleteDProjectInfoByProjectId(projectId);
+            if (rows > 0)
             {
-                try
-                {
-                    if (isDirectoryNotEmpty(projectPath))
-                    {
-                        errorMsg.append("项目目录不为空: ").append(projectPath).append("\n");
-                        continue;
-                    }
-                }
-                catch (IOException e)
-                {
-                    errorMsg.append("检查项目目录失败, 原因: ")
-                            .append(projectPath)
-                            .append(", 原因: ")
-                            .append(e.getMessage())
-                            .append("\n");
-                    continue;
-                }
-
-                try
-                {
-                    Files.deleteIfExists(projectPath);
-                }
-                catch (IOException e)
-                {
-                    errorMsg.append("删除项目目录失败, 原因: ")
-                            .append(projectPath)
-                            .append(", 原因: ")
-                            .append(e.getMessage())
-                            .append("\n");
-                    continue;
-                }
-
-                dProjectInfoMapper.deleteDProjectInfoByProjectId(projectId);
                 deleteProjectIds.add(projectId);
                 redisCache.deleteObject(CacheConstants.PROJECT_INFO_KEY + projectId);
-                log.info("删除项目, projectId={}", projectId);
+                log.info("删除项目, projectId={}, path={}", projectId, projectInfo.getPath());
+            }
+            else
+            {
+                errorMsg.append("删除项目失败: ").append(projectId).append("\n");
             }
         }
 
@@ -209,7 +155,8 @@ public class DProjectInfoServiceImpl implements IDProjectInfoService
         {
             throw new ServiceException(errorMsg.toString());
         }
-        return 1;
+
+        return deleteProjectIds.size();
     }
 
     @Override
@@ -220,35 +167,12 @@ public class DProjectInfoServiceImpl implements IDProjectInfoService
         {
             throw new ServiceException("项目不存在");
         }
+        // 暂时不检查、不删除真实项目目录，仅删除数据库记录
+        redisCache.deleteObject(CacheConstants.PROJECT_INFO_KEY + projectId);
 
-        Path projectPath = buildProjectRootPath(projectInfo.getPath());
-        try (PathLockManager.LockHandle ignored = pathLockManager.lockWrite(projectPath))
-        {
-            try
-            {
-                if (isDirectoryNotEmpty(projectPath))
-                {
-                    throw new ServiceException("项目目录不为空");
-                }
-            }
-            catch (IOException e)
-            {
-                throw new ServiceException("检查项目目录失败: " + e.getMessage());
-            }
+        log.info("删除项目, projectId={}, path={}", projectId, projectInfo.getPath());
 
-            try
-            {
-                Files.deleteIfExists(projectPath);
-            }
-            catch (IOException e)
-            {
-                throw new ServiceException("删除项目目录失败: " + e.getMessage());
-            }
-
-            redisCache.deleteObject(CacheConstants.PROJECT_INFO_KEY + projectId);
-            log.info("删除项目, projectId={}", projectId);
-            return dProjectInfoMapper.deleteDProjectInfoByProjectId(projectId);
-        }
+        return dProjectInfoMapper.deleteDProjectInfoByProjectId(projectId);
     }
 
     @Override
@@ -257,20 +181,4 @@ public class DProjectInfoServiceImpl implements IDProjectInfoService
         return dProjectInfoMapper.selectAllDProjectInfo();
     }
 
-    private Path buildProjectRootPath(String projectPath)
-    {
-        return Paths.get(profile, projectPath.startsWith("/") ? projectPath.substring(1) : projectPath).normalize();
-    }
-
-    private boolean isDirectoryNotEmpty(Path directory) throws IOException
-    {
-        if (Files.notExists(directory))
-        {
-            return false;
-        }
-        try (Stream<Path> stream = Files.list(directory))
-        {
-            return stream.findAny().isPresent();
-        }
-    }
 }

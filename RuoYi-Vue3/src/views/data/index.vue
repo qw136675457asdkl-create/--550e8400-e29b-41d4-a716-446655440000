@@ -1,4 +1,4 @@
-﻿﻿<template>
+﻿<template>
     <div class="app-container data-workspace-page">
         <div class="data-workspace-layout">
             <aside class="workspace-sidebar">
@@ -543,7 +543,7 @@
     </div>
 </template>
 <script setup name="Business">
-import {getdataList,getdataDetail,getMovePathTree,updatedata,deldata,adddata,previewData,downloadData,RenameDataName,backupData,getBackupDataList,restoreBackupData} from '@/api/data/bussiness'
+import {getdataList,getdataDetail,getMovePathTree,updatedata,deldata,adddata,previewData,previewFile,downloadData,RenameDataName,backupData,getBackupDataList,restoreBackupData} from '@/api/data/bussiness'
 import { getExperimentTree, addProjectInfo, addExperimentInfo, getInfo, updateInfo, delInfo } from "@/api/data/info"
 import { addDateRange, blobValidate } from "@/utils/ruoyi"
 import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
@@ -646,6 +646,8 @@ const detailPreviewPageSize = ref(200)
 const detailPreviewTotal = ref(0)
 const detailTableRows = ref([])
 const detailPreviewMessage = ref('')
+const detailPreviewUrl = ref('')
+const detailPreviewType = ref('unsupported')
 const detailPdfUrl = ref('')
 const detailMediaUrl = ref('')
 const movePathTreeOptions = ref([])
@@ -761,11 +763,11 @@ async function handleExportData() {
   }
 
   const selectedRows = businessList.value.filter(item => ids.value.includes(item.id))
-  const downloadableRows = selectedRows.filter(item => item.experimentId && item.dataFilePath)
+  const downloadableRows = selectedRows.filter(item => item?.id)
   const skippedCount = selectedRows.length - downloadableRows.length
 
   if (downloadableRows.length === 0) {
-    ElMessage.warning("选中的数据中没有关联的文件路径")
+    ElMessage.warning("选中的数据中没有可下载的文件")
     return
   }
 
@@ -1010,7 +1012,7 @@ async function handleCompareData() {
   comparePreviewItems.value = selectedBusinessRows.value.map(row => createComparePreviewItem(row))
   compareDialogVisible.value = true
 
-  await Promise.allSettled(comparePreviewItems.value.map(item => loadComparePreviewItem(item)))
+  await Promise.allSettled(comparePreviewItems.value.map(item => loadComparePreviewItemByPayload(item)))
 }
 
 function handleRestoreData() {
@@ -1326,7 +1328,16 @@ function updateBusinessUploadProgress(event, fileCount) {
   businessUploadProgress.visible = true
   businessUploadProgress.percentage = percentage
   businessUploadProgress.status = ''
-  businessUploadProgress.text = `正在上传 ${fileCount} 个文件... ${percentage}%`
+  businessUploadProgress.text = loaded >= total
+    ? `文件上传完成，正在服务器处理 ${fileCount} 个文件...`
+    : `正在上传 ${fileCount} 个文件... ${percentage}%`
+}
+
+function setBusinessUploadProgressState({ percentage, status = '', text = '' }) {
+  businessUploadProgress.visible = true
+  businessUploadProgress.percentage = Math.min(100, Math.max(0, Number(percentage) || 0))
+  businessUploadProgress.status = status
+  businessUploadProgress.text = text
 }
 
 function createBusinessDraftFile(rawFile, relativePath) {
@@ -1406,7 +1417,7 @@ function buildExperimentInfoFormData(data) {
   return formData
 }
 
-function buildBusinessUploadFormData(data) {
+function buildBusinessImportFormData(data, files = []) {
   const formData = new FormData()
 
   Object.entries(data || {}).forEach(([key, value]) => {
@@ -1414,11 +1425,11 @@ function buildBusinessUploadFormData(data) {
     formData.append(key, value)
   })
 
-  businessDraftFiles.value.forEach(file => {
-    if (!file?.raw) return
-    const relativePath = normalizeExperimentUploadPath(file.relativePath || file.name || file.raw.name)
-    formData.append('files', file.raw, relativePath || file.raw.name)
-    formData.append('relativePaths', relativePath || file.raw.name)
+  files.forEach(file => {
+    const rawFile = file?.raw
+    const relativePath = normalizeExperimentUploadPath(file?.relativePath || file?.name || rawFile?.name)
+    if (!rawFile || !relativePath) return
+    formData.append('files', rawFile, relativePath)
   })
 
   return formData
@@ -1844,13 +1855,13 @@ const comparePreviewItemHeight = computed(() => {
 
 
 const detailTableColumns = computed(() => Object.keys(detailTableRows.value[0] || {}))
-const isDetailTabularFile = computed(() => isTabularFile(detailFile.value))
-const isDetailTextFile = computed(() => isTextFile(detailFile.value))
-const isDetailPdfFile = computed(() => isPdfFile(detailFile.value))
-const isDetailImageFile = computed(() => isImageFile(detailFile.value))
-const isDetailAudioFile = computed(() => isAudioFile(detailFile.value))
-const isDetailVideoFile = computed(() => isVideoFile(detailFile.value))
-const isDetailBinaryFile = computed(() => isBinaryFile(detailFile.value))
+const isDetailTabularFile = computed(() => detailPreviewType.value === 'table')
+const isDetailTextFile = computed(() => detailPreviewType.value === 'text')
+const isDetailPdfFile = computed(() => detailPreviewType.value === 'pdf')
+const isDetailImageFile = computed(() => detailPreviewType.value === 'image')
+const isDetailAudioFile = computed(() => detailPreviewType.value === 'audio')
+const isDetailVideoFile = computed(() => detailPreviewType.value === 'video')
+const isDetailBinaryFile = computed(() => detailPreviewType.value === 'unsupported')
 const detailTextLines = computed(() =>
   detailTableRows.value.map(row => {
     if (row == null) return ''
@@ -2000,7 +2011,7 @@ function handleDetailWindowHeaderClick() {
 
 function getPreviewFileName(file) {
   if (!file) return ''
-  const candidates = [file.name, file.path, file.dataName, file.dataFilePath]
+  const candidates = [file.fileName, file.name, file.path, file.dataName, file.dataFilePath]
   const withSuffix = candidates.find(item => typeof item === 'string' && item.lastIndexOf('.') > -1)
   return (withSuffix || candidates.find(item => typeof item === 'string') || '').toLowerCase()
 }
@@ -2013,12 +2024,17 @@ function getPreviewFileExtension(file) {
 
 function isTabularFile(file) {
   const extension = getPreviewFileExtension(file)
-  return extension === 'csv' || extension === 'xls' || extension === 'xlsx'
+  return extension === 'csv'
 }
 
-function isTextFile(file) {
+function isTextPreviewFile(file) {
   const extension = getPreviewFileExtension(file)
-  return extension === 'txt' || extension === 'json' || extension === 'doc' || extension === 'docx'
+  return extension === 'txt' || extension === 'json' || extension === 'csv'
+}
+
+function isOfficeFile(file) {
+  const extension = getPreviewFileExtension(file)
+  return extension === 'xls' || extension === 'xlsx' || extension === 'doc' || extension === 'docx'
 }
 
 function isPdfFile(file) {
@@ -2043,6 +2059,10 @@ function isBinaryFile(file) {
   return extension === 'bin' || extension === 'dat' || extension === 'raw'
 }
 
+function isDownloadOnlyFile(file) {
+  return isBinaryFile(file)
+}
+
 function getPreviewMimeType(file) {
   const extension = getPreviewFileExtension(file)
   if (extension === 'jpg' || extension === 'jpeg') return 'image/jpeg'
@@ -2054,7 +2074,7 @@ function getPreviewMimeType(file) {
 }
 
 function getPreviewFileLabel(file) {
-  return file?.dataName || file?.name || file?.dataFilePath?.split(/[\\/]/).pop() || '未命名文件'
+  return file?.fileName || file?.dataName || file?.name || file?.dataFilePath?.split(/[\\/]/).pop() || '未命名文件'
 }
 
 function getDetailPreviewTitle(file) {
@@ -2062,10 +2082,11 @@ function getDetailPreviewTitle(file) {
   const fileLabel = getPreviewFileLabel(file)
 
   if (fileName.endsWith('.csv')) return `CSV文件预览: ${fileLabel}`
-  if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) return `Excel文件预览: ${fileLabel}`
-  if (fileName.endsWith('.txt')) return `Txt文件预览: ${fileLabel}`
+  if (fileName.endsWith('.txt')) return `文本文件预览: ${fileLabel}`
   if (fileName.endsWith('.json')) return `JSON文件预览: ${fileLabel}`
+  if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) return `Excel文件预览: ${fileLabel}`
   if (fileName.endsWith('.doc') || fileName.endsWith('.docx')) return `Word文件预览: ${fileLabel}`
+  if (isBinaryFile(file)) return `二进制文件下载: ${fileLabel}`
   if (fileName.endsWith('.pdf')) return `PDF文件预览: ${fileLabel}`
   if (isImageFile(file)) return `图片文件预览: ${fileLabel}`
   if (isAudioFile(file)) return `音频文件预览: ${fileLabel}`
@@ -2074,8 +2095,9 @@ function getDetailPreviewTitle(file) {
 }
 
 function resolveComparePreviewType(file) {
-  if (isTabularFile(file)) return 'table'
-  if (isTextFile(file)) return 'text'
+  const extension = getPreviewFileExtension(file)
+  if (extension === 'csv' || extension === 'xls' || extension === 'xlsx') return 'table'
+  if (extension === 'txt' || extension === 'json' || extension === 'doc' || extension === 'docx') return 'text'
   if (isPdfFile(file)) return 'pdf'
   if (isImageFile(file)) return 'image'
   if (isAudioFile(file)) return 'audio'
@@ -2111,7 +2133,9 @@ function getComparePreviewMeta(item) {
   let fileTypeLabel = '暂无内容'
 
   if (item.previewType === 'table' || item.previewType === 'text') {
-    fileTypeLabel = item.total > 0 ? `展示 ${item.rows.length}/${item.total}` : '暂无内容'
+    fileTypeLabel = item.rows.length > 0
+      ? (item.total > 0 ? `展示 ${item.rows.length}/${item.total}` : `展示 ${item.rows.length} 行`)
+      : '暂无内容'
   } else if (item.objectUrl) {
     fileTypeLabel = '已加载预览'
   } else if (item.loading) {
@@ -2124,7 +2148,7 @@ function getComparePreviewMeta(item) {
 function createComparePreviewItem(row) {
   return {
     id: row.id,
-    title: row.dataName || row.name || '未命名数据',
+    title: row.fileName || row.dataName || row.name || '未命名数据',
     row,
     loading: true,
     previewType: resolveComparePreviewType(row),
@@ -2138,7 +2162,7 @@ function createComparePreviewItem(row) {
 }
 
 function revokeComparePreviewItemUrl(item) {
-  if (!item?.objectUrl) return
+  if (!item?.objectUrl || !String(item.objectUrl).startsWith('blob:')) return
   URL.revokeObjectURL(item.objectUrl)
   item.objectUrl = ''
 }
@@ -2148,13 +2172,13 @@ function revokeComparePreviewUrls() {
 }
 
 function revokeDetailPdfUrl() {
-  if (!detailPdfUrl.value) return
+  if (!detailPdfUrl.value || !String(detailPdfUrl.value).startsWith('blob:')) return
   URL.revokeObjectURL(detailPdfUrl.value)
   detailPdfUrl.value = ''
 }
 
 function revokeDetailMediaUrl() {
-  if (!detailMediaUrl.value) return
+  if (!detailMediaUrl.value || !String(detailMediaUrl.value).startsWith('blob:')) return
   URL.revokeObjectURL(detailMediaUrl.value)
   detailMediaUrl.value = ''
 }
@@ -2168,7 +2192,9 @@ function resetDetailTablePreview() {
 
 function resetDetailPreviewState() {
   detailPreviewLoading.value = false
+  detailPreviewType.value = 'unsupported'
   detailPreviewMessage.value = ''
+  detailPreviewUrl.value = ''
   resetDetailTablePreview()
   revokeDetailPdfUrl()
   revokeDetailMediaUrl()
@@ -2226,126 +2252,117 @@ function closeDetailPreviewWindow() {
 }
 
 async function loadDetailTablePreview() {
-  if (!detailFile.value || !detailFile.value.path || !detailFile.value.experimentId) return
+  return loadDetailPreviewStateful()
+}
+
+async function loadDetailPdfPreview() {
+  return loadDetailPreviewStateful()
+}
+
+async function loadDetailMediaPreview() {
+  return loadDetailPreviewStateful()
+}
+
+async function resolveDetailPreviewUrl(file) {
+  if (!file?.id) {
+    throw new Error('缺少预览所需的文件信息')
+  }
+
+  const response = await previewData({ id: file.id })
+  if (response.code !== 200) {
+    throw new Error(response.msg || '获取预览地址失败')
+  }
+
+  const previewUrl = typeof response.data === 'string'
+    ? response.data
+    : response.data?.url || response.data?.previewUrl || ''
+
+  if (!previewUrl) {
+    throw new Error('预览地址为空')
+  }
+
+  return previewUrl
+}
+
+async function loadPreviewBlob(previewUrl) {
+  const data = await previewFile(previewUrl)
+  if (!blobValidate(data)) {
+    const responseText = await data.text()
+    const responseObj = JSON.parse(responseText)
+    throw new Error(responseObj.msg || '预览加载失败，请下载后查看')
+  }
+  return data
+}
+
+async function loadDetailTextPreview(previewUrl) {
+  const data = await loadPreviewBlob(previewUrl)
+  const text = await data.text()
+  const lines = text.split(/\r?\n/)
+  detailTableRows.value = lines.length > 0 ? lines : []
+  detailPreviewTotal.value = 0
+  detailPreviewMessage.value = lines.length > 0 ? '' : '暂无预览数据'
+}
+
+async function loadDetailInlinePreview(previewUrl, mimeType, targetRef) {
+  const data = await loadPreviewBlob(previewUrl)
+  const previewBlob = data.type === mimeType ? data : new Blob([data], { type: mimeType })
+  targetRef.value = URL.createObjectURL(previewBlob)
+}
+
+async function loadDetailPreviewByUrl() {
+  if (!detailFile.value || !detailFile.value.id) return
   detailPreviewLoading.value = true
   detailPreviewMessage.value = ''
+  revokeDetailPdfUrl()
+  revokeDetailMediaUrl()
+
   try {
-    const response = await previewData({
-      experimentId: detailFile.value.experimentId,
-      dataFilePath: detailFile.value.path,
-      pageNum: detailPreviewPageNum.value,
-      pageSize: detailPreviewPageSize.value
-    })
-    if (response.code === 200) {
-      const pageData = response.data || {}
-      detailTableRows.value = Array.isArray(pageData.rows) ? pageData.rows : []
-      detailPreviewTotal.value = Number(pageData.total) || 0
-      detailPreviewPageNum.value = Number(pageData.pageNum) || detailPreviewPageNum.value
-      detailPreviewPageSize.value = Number(pageData.pageSize) || detailPreviewPageSize.value
-      detailPreviewMessage.value = pageData.message || ''
-    } else {
-      detailTableRows.value = []
-      detailPreviewTotal.value = 0
-      detailPreviewMessage.value = response.msg || '预览失败，请下载后查看'
-      ElMessage.error(response.msg || "预览失败")
+    detailPreviewUrl.value = await resolveDetailPreviewUrl(detailFile.value)
+
+    if (isTextPreviewFile(detailFile.value)) {
+      await loadDetailTextPreview(detailPreviewUrl.value)
+      return
     }
+
+    if (isPdfFile(detailFile.value)) {
+      await loadDetailInlinePreview(detailPreviewUrl.value, 'application/pdf', detailPdfUrl)
+      return
+    }
+
+    if (isImageFile(detailFile.value)) {
+      await loadDetailInlinePreview(detailPreviewUrl.value, getPreviewMimeType(detailFile.value), detailMediaUrl)
+      return
+    }
+
+    if (isAudioFile(detailFile.value) || isVideoFile(detailFile.value)) {
+      await loadDetailInlinePreview(detailPreviewUrl.value, getPreviewMimeType(detailFile.value), detailMediaUrl)
+      return
+    }
+
+    if (isDownloadOnlyFile(detailFile.value)) {
+      detailPreviewMessage.value = '当前文件类型仅支持下载，请点击下载查看'
+      return
+    }
+
+    detailPreviewMessage.value = '暂不支持在线预览该文件，请下载后查看'
   } catch (error) {
-    detailTableRows.value = []
-    detailPreviewTotal.value = 0
     detailPreviewMessage.value = error?.message || '预览失败，请下载后查看'
   } finally {
     detailPreviewLoading.value = false
   }
 }
 
-async function loadDetailPdfPreview() {
-  if (!detailFile.value || !detailFile.value.dataFilePath || !detailFile.value.experimentId) return
-  detailPreviewLoading.value = true
-  detailPreviewMessage.value = ''
-  revokeDetailPdfUrl()
-
-  try {
-    const data = await downloadData({
-      id: detailFile.value.id,
-      experimentId: detailFile.value.experimentId,
-      dataFilePath: detailFile.value.dataFilePath
-    })
-
-    if (blobValidate(data)) {
-      const pdfBlob = data.type === 'application/pdf' ? data : new Blob([data], { type: 'application/pdf' })
-      detailPdfUrl.value = URL.createObjectURL(pdfBlob)
-      return
-    }
-
-    const responseText = await data.text()
-    const responseObj = JSON.parse(responseText)
-    detailPreviewMessage.value = responseObj.msg || 'PDF 预览加载失败，请下载后查看'
-  } catch (error) {
-    detailPreviewMessage.value = error?.message || 'PDF 预览加载失败，请下载后查看'
-  } finally {
-    detailPreviewLoading.value = false
-  }
-}
-
-async function loadDetailMediaPreview() {
-  if (!detailFile.value || !detailFile.value.dataFilePath || !detailFile.value.experimentId) return
-  detailPreviewLoading.value = true
-  detailPreviewMessage.value = ''
-  revokeDetailMediaUrl()
-
-  try {
-    const data = await downloadData({
-      id: detailFile.value.id,
-      experimentId: detailFile.value.experimentId,
-      dataFilePath: detailFile.value.dataFilePath
-    })
-
-    if (blobValidate(data)) {
-      const mimeType = getPreviewMimeType(detailFile.value)
-      const mediaBlob = data.type === mimeType ? data : new Blob([data], { type: mimeType })
-      detailMediaUrl.value = URL.createObjectURL(mediaBlob)
-      return
-    }
-
-    const responseText = await data.text()
-    const responseObj = JSON.parse(responseText)
-    detailPreviewMessage.value = responseObj.msg || '媒体预览加载失败，请下载后查看'
-  } catch (error) {
-    detailPreviewMessage.value = error?.message || '媒体预览加载失败，请下载后查看'
-  } finally {
-    detailPreviewLoading.value = false
-  }
-}
-
-async function loadCompareMediaPreview(item) {
+async function loadCompareInlinePreview(item) {
   const currentRow = item.row
+  const previewUrl = await resolveDetailPreviewUrl(currentRow)
   const previewType = resolveComparePreviewType(currentRow)
-
-  try {
-    const data = await downloadData({
-      id: currentRow.id,
-      experimentId: currentRow.experimentId,
-      dataFilePath: currentRow.dataFilePath
-    })
-
-    if (blobValidate(data)) {
-      const mimeType = getPreviewMimeType(currentRow)
-      const mediaBlob = data.type === mimeType ? data : new Blob([data], { type: mimeType })
-      item.objectUrl = URL.createObjectURL(mediaBlob)
-      item.previewType = previewType
-      item.message = ''
-      item.total = 1
-      return
-    }
-
-    const responseText = await data.text()
-    const responseObj = JSON.parse(responseText)
-    item.previewType = previewType
-    item.message = responseObj.msg || '预览加载失败，请下载后查看'
-  } catch (error) {
-    item.previewType = previewType
-    item.message = error?.message || '预览加载失败，请下载后查看'
-  }
+  const mimeType = getPreviewMimeType(currentRow)
+  const data = await loadPreviewBlob(previewUrl)
+  const mediaBlob = data.type === mimeType ? data : new Blob([data], { type: mimeType })
+  item.objectUrl = URL.createObjectURL(mediaBlob)
+  item.previewType = previewType
+  item.message = ''
+  item.total = 1
 }
 
 async function loadComparePreviewItem(item) {
@@ -2354,7 +2371,7 @@ async function loadComparePreviewItem(item) {
   item.message = ''
   revokeComparePreviewItemUrl(item)
 
-  if (!currentRow?.experimentId || !currentRow?.dataFilePath) {
+  if (!currentRow?.id) {
     item.previewType = 'unsupported'
     item.rows = []
     item.total = 0
@@ -2364,41 +2381,29 @@ async function loadComparePreviewItem(item) {
   }
 
   try {
-    if (isTabularFile(currentRow) || isTextFile(currentRow)) {
-      const response = await previewData({
-        experimentId: currentRow.experimentId,
-        dataFilePath: currentRow.dataFilePath,
-        pageNum: Number(item.pageNum) || 1,
-        pageSize: Number(item.pageSize) || COMPARE_PREVIEW_PAGE_SIZE
-      })
-
-      if (response.code === 200) {
-        const pageData = response.data || {}
-        item.previewType = pageData.previewType || resolveComparePreviewType(currentRow)
-        item.rows = Array.isArray(pageData.rows) ? pageData.rows : []
-        item.total = Number(pageData.total) || 0
-        item.pageNum = Number(pageData.pageNum) || Number(item.pageNum) || 1
-        item.pageSize = Number(pageData.pageSize) || Number(item.pageSize) || COMPARE_PREVIEW_PAGE_SIZE
-        item.message = pageData.message || ''
-      } else {
-        item.previewType = resolveComparePreviewType(currentRow)
-        item.rows = []
-        item.total = 0
-        item.message = response.msg || '预览失败，请下载后查看'
-      }
+    if (isTextPreviewFile(currentRow)) {
+      const previewUrl = await resolveDetailPreviewUrl(currentRow)
+      const data = await loadPreviewBlob(previewUrl)
+      const text = await data.text()
+      item.previewType = 'text'
+      item.rows = text.split(/\r?\n/)
+      item.total = 0
+      item.pageNum = 1
+      item.pageSize = COMPARE_PREVIEW_PAGE_SIZE
+      item.message = item.rows.length > 0 ? '' : '暂无预览内容'
       return
     }
 
     if (isPdfFile(currentRow) || isImageFile(currentRow) || isAudioFile(currentRow) || isVideoFile(currentRow)) {
-      await loadCompareMediaPreview(item)
+      await loadCompareInlinePreview(item)
       return
     }
 
     item.previewType = 'unsupported'
     item.rows = []
     item.total = 0
-    item.message = isBinaryFile(currentRow)
-      ? '暂不支持比对二进制文件，请下载后查看'
+    item.message = isDownloadOnlyFile(currentRow)
+      ? '暂不支持在线比对该文件，请下载后查看'
       : '暂不支持在线比对该文件'
   } catch (error) {
     item.previewType = resolveComparePreviewType(currentRow)
@@ -2412,12 +2417,193 @@ async function loadComparePreviewItem(item) {
 
 function handleComparePreviewPagination(item) {
   if (!item) return
-  return loadComparePreviewItem(item)
+  return loadComparePreviewItemByPayload(item)
 }
 
 function handleCompareDialogClosed() {
   revokeComparePreviewUrls()
   comparePreviewItems.value = []
+}
+
+async function requestPreviewPayloadV2(file, options = {}) {
+  if (!file?.id) {
+    throw new Error('缺少预览所需的文件信息')
+  }
+
+  const response = await previewData({
+    id: file.id,
+    pageNum: options.pageNum,
+    pageSize: options.pageSize
+  })
+
+  if (response.code !== 200) {
+    throw new Error(response.msg || '获取预览数据失败')
+  }
+
+  return response.data || {}
+}
+
+function applyDetailPagedPreviewV2(previewPayload) {
+  detailPreviewType.value = previewPayload.previewType || 'unsupported'
+  detailTableRows.value = Array.isArray(previewPayload.rows) ? previewPayload.rows : []
+  detailPreviewTotal.value = Number(previewPayload.total) || 0
+  detailPreviewPageNum.value = Number(previewPayload.pageNum) || detailPreviewPageNum.value
+  detailPreviewPageSize.value = Number(previewPayload.pageSize) || detailPreviewPageSize.value
+  detailPreviewMessage.value = previewPayload.message || (detailTableRows.value.length > 0 ? '' : '暂无预览数据')
+}
+
+async function loadDetailInlinePreviewV2(previewPayload, targetRef) {
+  const previewUrl = previewPayload.url || previewPayload.previewUrl || ''
+  if (!previewUrl) {
+    throw new Error('预览地址为空')
+  }
+
+  detailPreviewUrl.value = previewUrl
+  const data = await previewFile(previewUrl)
+  if (!blobValidate(data)) {
+    const responseText = await data.text()
+    const responseObj = JSON.parse(responseText)
+    throw new Error(responseObj.msg || '预览加载失败，请下载后查看')
+  }
+
+  const mimeType = previewPayload.mimeType || getPreviewMimeType(detailFile.value)
+  const previewBlob = data.type === mimeType ? data : new Blob([data], { type: mimeType })
+  targetRef.value = URL.createObjectURL(previewBlob)
+}
+
+async function loadDetailPreviewStateful() {
+  if (!detailFile.value?.id) return
+
+  detailPreviewLoading.value = true
+  detailPreviewType.value = 'unsupported'
+  detailPreviewMessage.value = ''
+  detailPreviewUrl.value = ''
+  detailTableRows.value = []
+  detailPreviewTotal.value = 0
+  revokeDetailPdfUrl()
+  revokeDetailMediaUrl()
+
+  try {
+    const previewPayload = await requestPreviewPayloadV2(detailFile.value, {
+      pageNum: detailPreviewPageNum.value,
+      pageSize: detailPreviewPageSize.value
+    })
+
+    if (previewPayload.fileName && detailFile.value) {
+      detailFile.value.fileName = previewPayload.fileName
+      if (!detailFile.value.name || detailFile.value.name === detailFile.value.dataName) {
+        detailFile.value.name = previewPayload.fileName
+      }
+      detailTitle.value = getDetailPreviewTitle(detailFile.value)
+    }
+
+    detailPreviewType.value = previewPayload.previewType || 'unsupported'
+
+    if (detailPreviewType.value === 'table' || detailPreviewType.value === 'text') {
+      applyDetailPagedPreviewV2(previewPayload)
+      return
+    }
+
+    detailPreviewMessage.value = previewPayload.message || ''
+
+    if (detailPreviewType.value === 'pdf') {
+      await loadDetailInlinePreviewV2(previewPayload, detailPdfUrl)
+      return
+    }
+
+    if (['image', 'audio', 'video'].includes(detailPreviewType.value)) {
+      await loadDetailInlinePreviewV2(previewPayload, detailMediaUrl)
+      return
+    }
+
+    detailPreviewMessage.value = previewPayload.message || '暂不支持在线预览该文件，请下载后查看'
+  } catch (error) {
+    detailPreviewType.value = 'unsupported'
+    detailPreviewMessage.value = error?.message || '预览失败，请下载后查看'
+  } finally {
+    detailPreviewLoading.value = false
+  }
+}
+
+async function loadCompareInlinePreviewV2(item, previewPayload) {
+  const previewUrl = previewPayload.url || previewPayload.previewUrl || ''
+  if (!previewUrl) {
+    throw new Error('预览地址为空')
+  }
+
+  const data = await previewFile(previewUrl)
+  if (!blobValidate(data)) {
+    const responseText = await data.text()
+    const responseObj = JSON.parse(responseText)
+    throw new Error(responseObj.msg || '预览加载失败，请下载后查看')
+  }
+
+  const mimeType = previewPayload.mimeType || getPreviewMimeType(item.row)
+  const mediaBlob = data.type === mimeType ? data : new Blob([data], { type: mimeType })
+  item.objectUrl = URL.createObjectURL(mediaBlob)
+  item.previewType = previewPayload.previewType || 'unsupported'
+  item.rows = []
+  item.total = 1
+  item.pageNum = 1
+  item.pageSize = 1
+  item.message = previewPayload.message || ''
+}
+
+async function loadComparePreviewItemByPayload(item) {
+  const currentRow = item.row
+  item.loading = true
+  item.message = ''
+  revokeComparePreviewItemUrl(item)
+
+  if (!currentRow?.id) {
+    item.previewType = 'unsupported'
+    item.rows = []
+    item.total = 0
+    item.message = '缺少比对预览所需的文件参数'
+    item.loading = false
+    return
+  }
+
+  try {
+    const previewPayload = await requestPreviewPayloadV2(currentRow, {
+      pageNum: Number(item.pageNum) || 1,
+      pageSize: Number(item.pageSize) || COMPARE_PREVIEW_PAGE_SIZE
+    })
+
+    if (previewPayload.fileName) {
+      currentRow.fileName = previewPayload.fileName
+      if (!item.title || item.title === currentRow.dataName || item.title === currentRow.name) {
+        item.title = previewPayload.fileName
+      }
+    }
+
+    item.previewType = previewPayload.previewType || 'unsupported'
+
+    if (item.previewType === 'table' || item.previewType === 'text') {
+      item.rows = Array.isArray(previewPayload.rows) ? previewPayload.rows : []
+      item.total = Number(previewPayload.total) || 0
+      item.pageNum = Number(previewPayload.pageNum) || Number(item.pageNum) || 1
+      item.pageSize = Number(previewPayload.pageSize) || Number(item.pageSize) || COMPARE_PREVIEW_PAGE_SIZE
+      item.message = previewPayload.message || (item.rows.length > 0 ? '' : '暂无预览内容')
+      return
+    }
+
+    if (['pdf', 'image', 'audio', 'video'].includes(item.previewType)) {
+      await loadCompareInlinePreviewV2(item, previewPayload)
+      return
+    }
+
+    item.rows = []
+    item.total = 0
+    item.message = previewPayload.message || '暂不支持在线比对该文件'
+  } catch (error) {
+    item.previewType = 'unsupported'
+    item.rows = []
+    item.total = 0
+    item.message = error?.message || '预览失败，请下载后查看'
+  } finally {
+    item.loading = false
+  }
 }
 
 
@@ -2477,8 +2663,10 @@ const submitUpload = async () => {
 
   fileLoading.value = true
   resetBusinessUploadProgress()
-  businessUploadProgress.visible = true
-  businessUploadProgress.text = `准备上传 ${selectedFiles.length} 个文件...`
+  setBusinessUploadProgressState({
+    percentage: 0,
+    text: `准备上传 ${selectedFiles.length} 个文件...`
+  })
   try {
     const businessData = {
       dataName: uploadDataForm.dataName,
@@ -2488,22 +2676,27 @@ const submitUpload = async () => {
       dataType: uploadDataForm.dataType,
       isSimulation: uploadDataForm.isSimulation
     }
-    const formData = buildBusinessUploadFormData(businessData)
-    await adddata(formData, {
+    const formData = buildBusinessImportFormData(businessData, selectedFiles)
+    const response = await adddata(formData, {
       silent: true,
+      timeout: 2 * 60 * 60 * 1000,
       onUploadProgress: event => updateBusinessUploadProgress(event, selectedFiles.length)
     })
-    businessUploadProgress.visible = true
-    businessUploadProgress.percentage = 100
-    businessUploadProgress.status = 'success'
-    businessUploadProgress.text = `上传完成，已处理 ${selectedFiles.length} 个文件`
-    proxy.$modal.msgSuccess(selectedFiles.length > 1 ? `成功导入 ${selectedFiles.length} 个文件` : '数据导入成功')
+    const importedCount = Number(response?.data) || selectedFiles.length
+    setBusinessUploadProgressState({
+      percentage: 100,
+      status: 'success',
+      text: `导入完成，已处理 ${importedCount} 个文件`
+    })
+    proxy.$modal.msgSuccess(importedCount > 1 ? `成功导入 ${importedCount} 个文件` : '数据导入成功')
     importVisible.value = false
     await getList()
   } catch (error) {
-    businessUploadProgress.visible = true
-    businessUploadProgress.status = 'exception'
-    businessUploadProgress.text = error?.message || '上传失败，请重试'
+    setBusinessUploadProgressState({
+      percentage: businessUploadProgress.percentage,
+      status: 'exception',
+      text: error?.message || '上传失败，请重试'
+    })
     showInfoRequestError(error, '数据导入失败')
   } finally {
     fileLoading.value = false
@@ -2513,18 +2706,18 @@ const submitUpload = async () => {
 /** 下载详情中的文件 */
 const handleDownloadDetailFile = async (row, options = {}) => {
   const { silent = false } = options
-  if(!row.experimentId || !row.dataFilePath){
+  if (!row?.id) {
     if (!silent) ElMessage.warning('缺少下载参数')
     return false
   }
   try {
     const data = await downloadData({
-      id: row?.id,
+      id: row.id,
       experimentId: row?.experimentId,
       dataFilePath: row?.dataFilePath
     })
     if (blobValidate(data)) {
-      const fileName = row.name || row.dataName || row.dataFilePath.split(/[\\/]/).pop() || 'download'
+      const fileName = row.fileName || row.name || row.dataName || row?.dataFilePath?.split(/[\\/]/).pop() || 'download'
       saveAs(new Blob([data]), fileName)
       return true
     }
@@ -2645,9 +2838,10 @@ function handleSelectionChange(selection) {
 
 /** 删除按钮操作 */
 function handleDelete(row) {
-  const _ids = row ? [row.id] : ids.value
-  proxy.$modal.confirm('是否确认删除ID为"' + _ids + '"的数据项？').then(function() {
-    return deldata(_ids)
+  const deleteTarget = row ? row.id : ids.value
+  const displayIds = Array.isArray(deleteTarget) ? deleteTarget.join(',') : deleteTarget
+  proxy.$modal.confirm('是否确认删除ID为"' + displayIds + '"的数据项？').then(function() {
+    return deldata(deleteTarget)
   }).then(() => {
     getList()
     proxy.$modal.msgSuccess("删除成功")
@@ -2705,49 +2899,27 @@ function submitForm() {
 }
 
 /** 详情按钮操作 (打开文件预览) */
-function handleView(row) {
-  if (row.dataFilePath) {
-    resetDetailDialogWindowState()
-    detailFile.value = {
-      id: row.id,
-      name: row.dataName,
-      path: row.dataFilePath,
-      dataFilePath: row.dataFilePath,
-      experimentId: row.experimentId
-    }
-
-    resetDetailPreviewState()
-    detailTitle.value = getDetailPreviewTitle(row)
-
-    if (isTabularFile(row) || isTextFile(row)) {
-      detailVisible.value = true
-      loadDetailTablePreview()
-      return
-    }
-
-    if (isPdfFile(row)) {
-      detailVisible.value = true
-      loadDetailPdfPreview()
-      return
-    }
-
-    if (isImageFile(row) || isAudioFile(row) || isVideoFile(row)) {
-      detailVisible.value = true
-      loadDetailMediaPreview()
-      return
-    }
-
-    if (isBinaryFile(row)) {
-      detailPreviewMessage.value = '暂不支持预览二进制文件，请下载后查看'
-      detailVisible.value = true
-      return
-    }
-
-    detailPreviewMessage.value = '暂不支持在线预览该文件'
-    detailVisible.value = true
-  } else {
-    ElMessage.warning("该数据没有关联的文件路径")
+async function handleView(row) {
+  if (!row?.id) {
+    ElMessage.warning("该数据缺少文件标识，无法预览")
+    return
   }
+
+  resetDetailDialogWindowState()
+  detailFile.value = {
+    id: row.id,
+    name: row.fileName || row.dataName || row.name,
+    fileName: row.fileName,
+    dataName: row.dataName,
+    path: row.dataFilePath,
+    dataFilePath: row.dataFilePath,
+    experimentId: row.experimentId
+  }
+
+  resetDetailPreviewState()
+  detailTitle.value = getDetailPreviewTitle(detailFile.value)
+  detailVisible.value = true
+  await loadDetailPreviewStateful()
 }
 
 function handleQuery(){

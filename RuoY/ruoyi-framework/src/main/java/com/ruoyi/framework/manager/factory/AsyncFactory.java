@@ -35,6 +35,8 @@ import org.slf4j.LoggerFactory;
 public class AsyncFactory
 {
     private static final Logger sys_user_logger = LoggerFactory.getLogger("sys-user");
+    private static final int NOTICE_CONTENT_MAX_LENGTH = 500;
+    private static final int NOTICE_CREATE_BY_MAX_LENGTH = 64;
 
     /**
      * 记录登录信息
@@ -106,7 +108,22 @@ public class AsyncFactory
             public void run()
             {
                 operLog.setOperLocation(AddressUtils.getRealAddressByIP(operLog.getOperIp()));
-                SpringUtils.getBean(ISysOperLogService.class).insertOperlog(operLog);
+                try
+                {
+                    SpringUtils.getBean(ISysOperLogService.class).insertOperlog(operLog);
+                }
+                catch (Exception e)
+                {
+                    sys_user_logger.error("insert oper log failed: title={}, operName={}",
+                            operLog.getTitle(), operLog.getOperName(), e);
+                    return;
+                }
+
+                if (!shouldCreateOperNotice(operLog))
+                {
+                    return;
+                }
+
                 try
                 {
                     SpringUtils.getBean(ISysNoticeService.class).insertNotice(buildOperNotice(operLog));
@@ -226,10 +243,23 @@ public class AsyncFactory
         String title = StringUtils.defaultIfBlank(operLog.getTitle(), "系统操作日志");
         notice.setNoticeTitle(StringUtils.left("系统操作日志公告-" + title, 50));
         notice.setNoticeType("2");
-        notice.setNoticeContent(buildOperNoticeContent(operLog, title));
+        notice.setNoticeContent(StringUtils.left(buildOperNoticeContent(operLog, title), NOTICE_CONTENT_MAX_LENGTH));
         notice.setStatus("0");
-        notice.setCreateBy(StringUtils.defaultIfBlank(operLog.getOperName(), "system"));
+        notice.setCreateBy(StringUtils.left(StringUtils.defaultIfBlank(operLog.getOperName(), "system"), NOTICE_CREATE_BY_MAX_LENGTH));
         return notice;
+    }
+
+    private static boolean shouldCreateOperNotice(SysOperLog operLog)
+    {
+        if (operLog == null)
+        {
+            return false;
+        }
+        if (operLog.getStatus() != null && operLog.getStatus().intValue() == BusinessStatus.FAIL.ordinal())
+        {
+            return true;
+        }
+        return operLog.getRiskLevel() != null && operLog.getRiskLevel().intValue() >= 3;
     }
 
     private static String buildOperNoticeContent(SysOperLog operLog, String title)

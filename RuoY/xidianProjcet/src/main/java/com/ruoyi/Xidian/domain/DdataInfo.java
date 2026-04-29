@@ -25,6 +25,7 @@ public class DdataInfo extends BaseEntity {
     private String dataName;
     private String dataType;
     private String dataFilePath;
+    private Long storageFileId;
     private String deviceId;
     private String deviceInfo;
     private Integer sampleFrequency;
@@ -122,6 +123,14 @@ public class DdataInfo extends BaseEntity {
 
     public String getDataFilePath() {
         return dataFilePath;
+    }
+
+    public void setStorageFileId(Long storageFileId) {
+        this.storageFileId = storageFileId;
+    }
+
+    public Long getStorageFileId() {
+        return storageFileId;
     }
 
     public void setDeviceId(String deviceId) {

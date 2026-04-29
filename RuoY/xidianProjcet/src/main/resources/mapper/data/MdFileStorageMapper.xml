@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.Xidian.mapper.MdFileStorageMapper">
+
+    <resultMap id="MdFileStorageResultMap" type="com.ruoyi.Xidian.domain.MdFileStorage">
+        <id column="id" property="id" />
+        <result column="business_type" property="businessType" />
+        <result column="business_id" property="businessId" />
+        <result column="storage_provider" property="storageProvider" />
+        <result column="bucket_name" property="bucketName" />
+        <result column="object_name" property="objectName" />
+        <result column="original_file_name" property="originalFileName" />
+        <result column="file_ext" property="fileExt" />
+        <result column="content_type" property="contentType" />
+        <result column="file_size" property="fileSize" />
+        <result column="etag" property="etag" />
+        <result column="upload_status" property="uploadStatus" />
+        <result column="upload_user_id" property="uploadUserId" />
+        <result column="upload_user_name" property="uploadUserName" />
+        <result column="completed_time" property="completedTime" />
+        <result column="remark" property="remark" />
+        <result column="create_by" property="createBy" />
+        <result column="create_time" property="createTime" />
+        <result column="update_by" property="updateBy" />
+        <result column="update_time" property="updateTime" />
+    </resultMap>
+
+    <insert id="insertMdFileStorage" parameterType="com.ruoyi.Xidian.domain.MdFileStorage"
+            useGeneratedKeys="true" keyProperty="id" keyColumn="ID">
+        INSERT INTO SYSTEM_COLLABORATION_TEST.md_file_storage (
+            business_type,
+            business_id,
+            storage_provider,
+            bucket_name,
+            object_name,
+            original_file_name,
+            file_ext,
+            content_type,
+            file_size,
+            etag,
+            upload_status,
+            upload_user_id,
+            upload_user_name,
+            completed_time,
+            remark,
+            create_by,
+            create_time,
+            update_by,
+            update_time
+        ) VALUES (
+            #{businessType},
+            #{businessId},
+            #{storageProvider},
+            #{bucketName},
+            #{objectName},
+            #{originalFileName},
+            #{fileExt},
+            #{contentType},
+            #{fileSize},
+            #{etag},
+            #{uploadStatus},
+            #{uploadUserId},
+            #{uploadUserName},
+            #{completedTime},
+            #{remark},
+            #{createBy},
+            #{createTime},
+            #{updateBy},
+            #{updateTime}
+        )
+    </insert>
+
+    <update id="updateMdFileStorage" parameterType="com.ruoyi.Xidian.domain.MdFileStorage">
+        UPDATE SYSTEM_COLLABORATION_TEST.md_file_storage
+        SET business_type = #{businessType},
+            business_id = #{businessId},
+            storage_provider = #{storageProvider},
+            original_file_name = #{originalFileName},
+            file_ext = #{fileExt},
+            content_type = #{contentType},
+            file_size = #{fileSize},
+            etag = #{etag},
+            upload_status = #{uploadStatus},
+            upload_user_id = #{uploadUserId},
+            upload_user_name = #{uploadUserName},
+            completed_time = #{completedTime},
+            remark = #{remark},
+            update_by = #{updateBy},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateFileStorgeStatus" parameterType="java.util.List">
+        <foreach collection="list" item="item" separator=";">
+            UPDATE SYSTEM_COLLABORATION_TEST.md_file_storage
+            SET upload_status = #{item.uploadStatus},
+                update_by = #{item.updateBy},
+                update_time = #{item.updateTime}
+            WHERE id = #{item.id}
+        </foreach>
+    </update>
+
+
+    <select id="selectById" resultMap="MdFileStorageResultMap">
+        SELECT
+            id,
+            business_type,
+            business_id,
+            storage_provider,
+            bucket_name,
+            object_name,
+            original_file_name,
+            file_ext,
+            content_type,
+            file_size,
+            etag,
+            upload_status,
+            upload_user_id,
+            upload_user_name,
+            completed_time,
+            remark,
+            create_by,
+            create_time,
+            update_by,
+            update_time
+        FROM SYSTEM_COLLABORATION_TEST.md_file_storage
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByBussinessId" resultMap="MdFileStorageResultMap">
+        SELECT
+            id,
+            business_type,
+            business_id,
+            storage_provider,
+            bucket_name,
+            object_name,
+            original_file_name,
+            file_ext,
+            content_type,
+            file_size,
+            etag,
+            upload_status,
+            upload_user_id,
+            upload_user_name,
+            completed_time,
+            remark,
+            create_by,
+            create_time,
+            update_by,
+            update_time
+        FROM SYSTEM_COLLABORATION_TEST.md_file_storage
+        WHERE business_id = #{dataInfoId}
+    </select>
+
+    <select id="selectByBucketAndObjectName" resultMap="MdFileStorageResultMap">
+        SELECT
+            id,
+            business_type,
+            business_id,
+            storage_provider,
+            bucket_name,
+            object_name,
+            original_file_name,
+            file_ext,
+            content_type,
+            file_size,
+            etag,
+            upload_status,
+            upload_user_id,
+            upload_user_name,
+            completed_time,
+            remark,
+            create_by,
+            create_time,
+            update_by,
+            update_time
+        FROM SYSTEM_COLLABORATION_TEST.md_file_storage
+        WHERE bucket_name = #{bucketName}
+          AND object_name = #{objectName}
+    </select>
+</mapper>

@@ -1,5 +1,7 @@
 {
     "java.compile.nullAnalysis.mode": "disabled",
     "chatgpt.commentCodeLensEnabled": false,
-    "java.configuration.updateBuildConfiguration": "automatic"
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "trae.tab.enableRename": false,
+    "trae.tab.enableAutoImport": false
 }

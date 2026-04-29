@@ -6,8 +6,8 @@ import com.ruoyi.Xidian.domain.TreeTable;
 import com.ruoyi.Xidian.domain.VO.TreeTableVo;
 import com.ruoyi.Xidian.mapper.DExperimentInfoMapper;
 import com.ruoyi.Xidian.mapper.DProjectInfoMapper;
+import com.ruoyi.Xidian.mapper.DdataMapper;
 import com.ruoyi.Xidian.service.IDExperimentInfoService;
-import com.ruoyi.Xidian.support.PathLockManager;
 import com.ruoyi.common.config.RuoYiConfig;
 import com.ruoyi.common.constant.CacheConstants;
 import com.ruoyi.common.core.redis.RedisCache;
@@ -18,19 +18,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 
 @Service
 public class DExperimentInfoServiceImpl implements IDExperimentInfoService
@@ -44,10 +39,10 @@ public class DExperimentInfoServiceImpl implements IDExperimentInfoService
     private DProjectInfoMapper dProjectInfoMapper;
 
     @Autowired
-    private RedisCache redisCache;
+    private DdataMapper ddataMapper;
 
     @Autowired
-    private PathLockManager pathLockManager;
+    private RedisCache redisCache;
 
     private final String profile = RuoYiConfig.getProfile() + "/data";
 
@@ -149,57 +144,37 @@ public class DExperimentInfoServiceImpl implements IDExperimentInfoService
     }
 
     @Override
-    public int insertDExperimentInfo(DExperimentInfo dExperimentInfo)
+    @Transactional(rollbackFor = Exception.class)
+    public String insertDExperimentInfo(DExperimentInfo dExperimentInfo)
     {
         if (dExperimentInfo.getExperimentName() == null
                 || !dExperimentInfo.getExperimentName().matches("^[a-zA-Z0-9_\\-\\u4e00-\\u9fa5]+$"))
         {
-            throw new ServiceException("试验名称无效");
+            return "试验名称无效";
         }
-
-        DProjectInfo projectInfo = requireProject(dExperimentInfo.getProjectId());
-        String pathStr = dExperimentInfo.getExperimentName();
-        Path projectRoot = buildProjectRootPath(projectInfo.getPath());
-
-        while (true)
-        {
-            Path experimentPath = buildExperimentRootPath(projectInfo.getPath(), "/" + pathStr);
-            try (PathLockManager.LockHandle ignored = pathLockManager.lock(
-                    buildPaths(projectRoot),
-                    buildPaths(experimentPath)))
-            {
-                if (dExperimentInfoMapper.selectSamePathExperiment(dExperimentInfo.getExperimentName(),dExperimentInfo.getProjectId())!=null
-                        ||Files.exists(experimentPath))
-                {
-                    throw new ServiceException("同一项目下不允许有相同的试验名称");
-                }
-
-                try
-                {
-                    Files.createDirectories(experimentPath);
-                }
-                catch (IOException e)
-                {
-                    throw new ServiceException("创建试验目录失败: " + e.getMessage());
-                }
-
-                dExperimentInfo.setPath("/" + pathStr);
-                log.info("新增试验信息, experimentName={}, projectId={}", dExperimentInfo.getExperimentName(), dExperimentInfo.getProjectId());
-                return dExperimentInfoMapper.insertDExperimentInfo(dExperimentInfo);
+        requireProject(dExperimentInfo.getProjectId());
+        List<DExperimentInfo> dExperimentInfos = dExperimentInfoMapper
+                .selectExperimentByProjectIdAndExperimentName(dExperimentInfo.getProjectId(), dExperimentInfo.getExperimentName());
+        for (DExperimentInfo dExperimentInfo1 : dExperimentInfos) {
+            if (dExperimentInfo1.getExperimentId() == null
+                    || !dExperimentInfo1.getExperimentId().equals(dExperimentInfo.getExperimentId())) {
+                return "同一项目下试验名称不能重复";
             }
         }
+        dExperimentInfo.setPath("/" + dExperimentInfo.getExperimentName());
+        dExperimentInfoMapper.insertDExperimentInfo(dExperimentInfo);
+        return null;
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int updateDExperimentInfo(DExperimentInfo dExperimentInfo)
     {
         dExperimentInfo.setUpdateTime(DateUtils.getNowDate());
 
-        if (!dExperimentInfo.getPath().startsWith("/"))
-        {
-            throw new ServiceException("试验路径无效");
-        }
-        if (!dExperimentInfo.getPath().substring(1).matches("^[a-zA-Z0-9_\\-\\u4e00-\\u9fa5]+$"))
+        if (dExperimentInfo.getPath() == null
+                || !dExperimentInfo.getPath().startsWith("/")
+                || !dExperimentInfo.getPath().substring(1).matches("^[a-zA-Z0-9_\\-\\u4e00-\\u9fa5]+$"))
         {
             throw new ServiceException("试验路径无效");
         }
@@ -211,38 +186,25 @@ public class DExperimentInfoServiceImpl implements IDExperimentInfoService
             throw new ServiceException("试验信息不存在");
         }
 
-        DProjectInfo oldProjectInfo = requireProject(oldExperimentInfo.getProjectId());
-        DProjectInfo newProjectInfo = requireProject(dExperimentInfo.getProjectId());
-        Path oldProjectRoot = buildProjectRootPath(oldProjectInfo.getPath());
-        Path newProjectRoot = buildProjectRootPath(newProjectInfo.getPath());
-        Path oldPath = buildExperimentRootPath(oldProjectInfo.getPath(), oldExperimentInfo.getPath());
-        Path newPath = buildExperimentRootPath(newProjectInfo.getPath(), dExperimentInfo.getPath());
-
-        try (PathLockManager.LockHandle ignored = pathLockManager.lock(
-                buildPaths(oldProjectRoot, newProjectRoot),
-                buildPaths(oldPath, newPath)))
+        requireProject(dExperimentInfo.getProjectId());
+        List<DExperimentInfo> sameNameExperiments = dExperimentInfoMapper
+                .selectExperimentByProjectIdAndExperimentName(dExperimentInfo.getProjectId(), dExperimentInfo.getExperimentName());
+        for (DExperimentInfo item : sameNameExperiments)
         {
-            if (Files.exists(newPath) && !newPath.equals(oldPath))
+            if (!experimentId.equals(item.getExperimentId()))
             {
-                throw new ServiceException("目标试验路径已存在");
-            }
-
-            try
-            {
-                if (!newPath.equals(oldPath))
-                {
-                    Files.move(oldPath, newPath);
-                }
-            }
-            catch (IOException e)
-            {
-                throw new ServiceException("更新试验目录失败: " + e.getMessage());
+                throw new ServiceException("同一项目下试验名称不能重复");
             }
         }
 
         redisCache.deleteObject(CacheConstants.EXPERIMENT_INFO_KEY + experimentId);
         redisCache.deleteObject(CacheConstants.EXPERIMENT_PATH_KEY + experimentId);
-        log.info("更新试验信息, experimentId={}", experimentId);
+
+        log.info("更新试验信息, experimentId={}, projectId={}, fakePath={}",
+                experimentId,
+                dExperimentInfo.getProjectId(),
+                dExperimentInfo.getPath());
+
         return dExperimentInfoMapper.updateDExperimentInfo(dExperimentInfo);
     }
 
@@ -266,66 +228,14 @@ public class DExperimentInfoServiceImpl implements IDExperimentInfoService
         }
 
         List<String> deleteExperimentIds = new ArrayList<>();
-        StringBuilder errorMsg = new StringBuilder();
 
         for (DExperimentInfo experimentInfo : experimentInfos)
         {
-            Long projectId = experimentInfo.getProjectId();
-            if (projectId == null)
-            {
-                errorMsg.append("项目不存在: ").append(experimentInfo.getExperimentId()).append("\n");
-                continue;
-            }
-
-            DProjectInfo projectInfo = requireProject(projectId);
-            Path projectRoot = buildProjectRootPath(projectInfo.getPath());
-            Path experimentPath = buildExperimentRootPath(projectInfo.getPath(), experimentInfo.getPath());
-
-            try (PathLockManager.LockHandle ignored = pathLockManager.lock(
-                    buildPaths(projectRoot),
-                    buildPaths(experimentPath)))
-            {
-                try
-                {
-                    if (containsFilesInTree(experimentPath))
-                    {
-                        errorMsg.append("试验目录不为空: ")
-                                .append(experimentPath)
-                                .append("\n");
-                        continue;
-                    }
-                }
-                catch (IOException e)
-                {
-                    errorMsg.append("检查试验目录失败: ")
-                            .append(e.getMessage())
-                            .append("\n");
-                    continue;
-                }
-
-                try
-                {
-                    deleteDirectoryTree(experimentPath);
-                }
-                catch (IOException e)
-                {
-                    errorMsg.append("删除试验目录失败: ")
-                            .append(e.getMessage())
-                            .append("\n");
-                    continue;
-                }
-
-                dExperimentInfoMapper.deleteDExperimentInfoByExperimentId(experimentInfo.getExperimentId());
-                deleteExperimentIds.add(experimentInfo.getExperimentId());
-                redisCache.deleteObject(CacheConstants.EXPERIMENT_INFO_KEY + experimentInfo.getExperimentId());
-                redisCache.deleteObject(CacheConstants.EXPERIMENT_PATH_KEY + experimentInfo.getExperimentId());
-                log.info("删除试验信息, experimentId={}", experimentInfo.getExperimentId());
-            }
-        }
-
-        if (errorMsg.length() > 0 && deleteExperimentIds.size() != experimentIds.length)
-        {
-            throw new ServiceException(errorMsg.toString());
+            dExperimentInfoMapper.deleteDExperimentInfoByExperimentId(experimentInfo.getExperimentId());
+            deleteExperimentIds.add(experimentInfo.getExperimentId());
+            redisCache.deleteObject(CacheConstants.EXPERIMENT_INFO_KEY + experimentInfo.getExperimentId());
+            redisCache.deleteObject(CacheConstants.EXPERIMENT_PATH_KEY + experimentInfo.getExperimentId());
+            log.info("删除试验信息, experimentId={}", experimentInfo.getExperimentId());
         }
         return 1;
     }
@@ -339,40 +249,21 @@ public class DExperimentInfoServiceImpl implements IDExperimentInfoService
             throw new ServiceException("试验信息不存在");
         }
 
-        DProjectInfo projectInfo = requireProject(experimentInfo.getProjectId());
-        Path projectRoot = buildProjectRootPath(projectInfo.getPath());
-        Path experimentPath = buildExperimentRootPath(projectInfo.getPath(), experimentInfo.getPath());
-
-        try (PathLockManager.LockHandle ignored = pathLockManager.lock(
-                buildPaths(projectRoot),
-                buildPaths(experimentPath)))
+        int dataCount = ddataMapper.countByExperimentId(experimentId);
+        if (dataCount > 0)
         {
-            try
-            {
-                if (containsFilesInTree(experimentPath))
-                {
-                    throw new ServiceException("试验目录不为空");
-                }
-            }
-            catch (IOException e)
-            {
-                throw new ServiceException("检查试验目录失败: " + e.getMessage());
-            }
-
-            try
-            {
-                deleteDirectoryTree(experimentPath);
-            }
-            catch (IOException e)
-            {
-                throw new ServiceException("删除试验目录失败: " + e.getMessage());
-            }
-
-            redisCache.deleteObject(CacheConstants.EXPERIMENT_INFO_KEY + experimentId);
-            redisCache.deleteObject(CacheConstants.EXPERIMENT_PATH_KEY + experimentId);
-            log.info("删除试验信息, experimentId={}", experimentId);
-            return dExperimentInfoMapper.deleteDExperimentInfoByExperimentId(experimentId);
+            throw new ServiceException("试验下存在数据，不能删除");
         }
+
+        redisCache.deleteObject(CacheConstants.EXPERIMENT_INFO_KEY + experimentId);
+        redisCache.deleteObject(CacheConstants.EXPERIMENT_PATH_KEY + experimentId);
+
+        log.info("删除试验信息, experimentId={}, projectId={}, fakePath={}",
+                experimentId,
+                experimentInfo.getProjectId(),
+                experimentInfo.getPath());
+
+        return dExperimentInfoMapper.deleteDExperimentInfoByExperimentId(experimentId);
     }
 
     @Override
@@ -391,82 +282,6 @@ public class DExperimentInfoServiceImpl implements IDExperimentInfoService
         return projectInfo;
     }
 
-    private Path buildProjectRootPath(String projectPath)
-    {
-        return Paths.get(profile, StringUtils.removeStart(projectPath, "/")).normalize();
-    }
-
-    private Path buildExperimentRootPath(String projectPath, String experimentPath)
-    {
-        return Paths.get(
-                profile,
-                StringUtils.removeStart(projectPath, "/"),
-                StringUtils.removeStart(experimentPath, "/")
-        ).normalize();
-    }
-
-    private List<Path> buildPaths(Path... paths)
-    {
-        List<Path> result = new ArrayList<>();
-        if (paths == null)
-        {
-            return result;
-        }
-        for (Path path : paths)
-        {
-            if (path != null)
-            {
-                result.add(path);
-            }
-        }
-        return result;
-    }
-
-    private boolean containsFilesInTree(Path directory) throws IOException
-    {
-        if (Files.notExists(directory))
-        {
-            return false;
-        }
-        try (Stream<Path> stream = Files.walk(directory))
-        {
-            return stream.anyMatch(path -> !path.equals(directory) && Files.isRegularFile(path));
-        }
-    }
-
-    private void deleteDirectoryTree(Path directory) throws IOException
-    {
-        if (Files.notExists(directory))
-        {
-            return;
-        }
-        try (Stream<Path> stream = Files.walk(directory))
-        {
-            stream.sorted(
-                            Comparator.comparingInt(Path::getNameCount)
-                                    .reversed()
-                                    .thenComparing(Path::toString, Comparator.reverseOrder()))
-                    .forEach(path ->
-                    {
-                        try
-                        {
-                            Files.deleteIfExists(path);
-                        }
-                        catch (IOException e)
-                        {
-                            throw new RuntimeException(e);
-                        }
-                    });
-        }
-        catch (RuntimeException e)
-        {
-            if (e.getCause() instanceof IOException)
-            {
-                throw (IOException) e.getCause();
-            }
-            throw e;
-        }
-    }
     public String getExperimentPath(String experimentId){
         if(redisCache.getCacheObject(CacheConstants.EXPERIMENT_PATH_KEY + experimentId) != null){
             return redisCache.getCacheObject(CacheConstants.EXPERIMENT_PATH_KEY + experimentId).toString();
@@ -481,14 +296,19 @@ public class DExperimentInfoServiceImpl implements IDExperimentInfoService
         DExperimentInfo experimentInfo = dExperimentInfoMapper.selectDExperimentInfoByExperimentId(experimentId);
         if (experimentInfo == null)
         {
-            throw new ServiceException("试验不能为空?");
+            throw new ServiceException("试验不能为空");
         }
-        String experimentPath = experimentInfo.getPath();
-        String projectPath = requireProject(experimentInfo.getProjectId()).getPath();
-        return projectPath + experimentPath;
+        DProjectInfo projectInfo = requireProject(experimentInfo.getProjectId());
+        String projectName = projectInfo.getProjectName();
+        String experimentName = experimentInfo.getExperimentName();
+        if (StringUtils.isEmpty(projectName) || StringUtils.isEmpty(experimentName))
+        {
+            throw new ServiceException("试验路径无效");
+        }
+        return "/" + projectName + "/" + experimentName;
     }
 
-    //返回前端所需的试验信息路径（./data/项目路径/试验路径/）
+    //返回前端所需的试验信息路径（./data/项目路径/试验路径/），当前仅用于展示假路径
     public String getFrontEndExperimentPath(String experimentId){
         return getExperimentPath(experimentId).replace(profile, "./data");
     }

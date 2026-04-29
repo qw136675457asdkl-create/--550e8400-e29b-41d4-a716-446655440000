@@ -15,6 +15,7 @@ import com.ruoyi.Xidian.service.SimulationTaskService;
 import com.ruoyi.Xidian.service.SimulationTaskStreamQueue;
 import com.ruoyi.Xidian.utils.NickNameUtil;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,14 +95,6 @@ public class SimulationTaskServiceImpl implements SimulationTaskService
             }
             log.info("Validating sub task before insert, taskId={}, groupName={}, dataName={}, outputType={}, targetNum={}",
                     task.getId(), group.getGroupName(), group.getDataName(), group.getOutputType(), group.getTargetNum());
-            String dataFilePath = "/" + group.getDataName() + group.getOutputType();
-            if (dataMapper.selectSameNameFile(task.getExperimentId(), "/" + group.getDataName() + "." + group.getOutputType()) != null)
-            {
-                log.warn("Duplicate data name detected, taskId={}, groupName={}, dataName={}, outputType={}",
-                        task.getId(), group.getGroupName(), group.getDataName(), group.getOutputType());
-                taskMapper.deleteById(task.getId());
-                throw new ServiceException("当前试验下已存在" + group.getDataName());
-            }
             if (group.getTargetNum() != null
                     && group.getTargetNum() < 3
                     && (Objects.equals(group.getGroupName(), "radar_track") || Objects.equals(group.getGroupName(), "ads_b")))
@@ -167,6 +160,7 @@ public class SimulationTaskServiceImpl implements SimulationTaskService
         task.setUpdateTime(now);
         task.setPath(dExperimentInfoService.getExperimentRelativePath(task.getExperimentId()));
         task.setDataCategorySummary(buildDataCategorySummary(request));
+        task.setCreateUserId(SecurityUtils.getUserId());
         return task;
     }
 
